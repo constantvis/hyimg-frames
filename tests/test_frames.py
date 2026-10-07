@@ -17,7 +17,11 @@ def free_port():
 
 
 @pytest.fixture
-def hy(tmp_path):
+def hy(tmp_path, request):
+    # the interface's language (owner 2026-10-06: «make 2 versions, Russian and English»): the app's setting cv.lang in its settings
+    # file; these tests read the Russian words, an English test asks for "en" (indirect parametrize), which is the app's default
+    lang = getattr(request, "param", "ru")
+    (tmp_path / "settings.json").write_text(json.dumps({"cv.lang": "ru"} if lang == "ru" else {}))
     lib, state, plugins = tmp_path / "lib", tmp_path / "state", tmp_path / "plugins"
     (lib / "html/demo").mkdir(parents=True); (lib / "html/demo/index.html").write_text(PAGE)
     (lib / "html/demo/style.css").write_text("body { background: rgb(10, 120, 200); color: white; } h1 { font-size: 64px; }")
@@ -32,8 +36,10 @@ def hy(tmp_path):
     for _ in range(100):
         try: urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1); break
         except OSError: time.sleep(0.1)
-    yield port, lib, state
-    proc.terminate(); proc.wait(5); log.close()
+    try:   # the server goes even when the test fails or is interrupted
+        yield port, lib, state
+    finally:
+        proc.terminate(); proc.wait(5); log.close()
 
 
 def wait(cond, t=60):

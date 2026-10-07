@@ -9,7 +9,7 @@
  *   frame: [x, y, w, h] of the document inside the source, in its pixels: the vignette belongs to the document, so the editor's view
  *   (the document somewhere in the window) and the frame's render (the document alone) darken the same corners (2026-10-05)
  *   HyColorGrade.defaults(), .normalize(p), .isNeutral(p), .presets, .histogram(src)
- *   const panel = HyColorGrade.createPanel(el, params, onChange, {theme, onBeforeAfter})
+ *   const panel = HyColorGrade.createPanel(el, params, onChange, {theme, onBeforeAfter})   (the panel's sliders are the app's: <script src="/ui/slider.js"> first)
  *     -> {set(p), get(), setHistogram(h), setBefore(b), before, el, destroy()}
  */
 (function (global) {
@@ -21,6 +21,7 @@
   const HUE_LABEL = { red: 'Reds', orange: 'Oranges', yellow: 'Yellows', green: 'Greens', aqua: 'Aquas', blue: 'Blues', purple: 'Purples', magenta: 'Magentas' };
   const HUE_DEG = { red: 0, orange: 30, yellow: 60, green: 120, aqua: 180, blue: 240, purple: 270, magenta: 300 };
   const ID_CURVE = () => [[0, 0], [255, 255]];
+  const SC = global.HySelColor || (() => { throw new Error('HyColorGrade needs editor/selcolor.js loaded first (Selective Color, grade.sc)'); })();
 
   function defaults() {
     const hsl = {};
@@ -39,8 +40,30 @@
       grading: { shadows: zone(), midtones: zone(), highlights: zone(), global: zone(), blending: 50, balance: 0 },
       sharpening: 0, sharpenRadius: 1, noiseReduction: 0,
       vignette: { amount: 0, midpoint: 50, roundness: 0, feather: 50 },
-      grain: { amount: 0, size: 25, roughness: 50 }
+      grain: { amount: 0, size: 25, roughness: 50 },
+      hs: hsDefaults(), sc: SC.defaults(),
+      // switched off, values kept (owner 2026-10-06): the whole grade (the header's eye) and each section (its own eye); a grade saved
+      // before has neither, so it is on
+      bypass: 0,
+      off: { basic: 0, curve: 0, detail: 0, mixer: 0, hs: 0, sc: 0, grading: 0, effects: 0 }
     };
+  }
+  // what each section of the panel changes: its reset and its eye act on these
+  const SECTION_PATHS = {
+    basic: ['temp', 'tint', 'exposure', 'contrast', 'highlights', 'shadows', 'whites', 'blacks', 'texture', 'clarity', 'dehaze', 'vibrance', 'saturation'],
+    curve: ['curve'], detail: ['sharpening', 'sharpenRadius', 'noiseReduction'], mixer: ['hsl'], hs: ['hs'], sc: ['sc'], grading: ['grading'], effects: ['vignette', 'grain']
+  };
+
+  // Photoshop's Hue/Saturation (owner 2026-10-06, with a screenshot of Properties › Hue/Saturation): Master and six colour ranges, each
+  // with Hue −180…180, Saturation −100…100, Lightness −100…100; a range's r is [a, b, c, d] in degrees (red at 0): full effect from b to
+  // c, fading out to a and to d (Photoshop's defaults: 30° inside, 30° of falloff each side; a may be negative, d may pass 360). Colorize
+  // (colorize: 1) replaces the colours by one hue: ch 0…360, cs 0…100 (Photoshop starts it at 25), cl −100…100.
+  const HS_RANGES = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas'];
+  const HS_CENTER = { reds: 0, yellows: 60, greens: 120, cyans: 180, blues: 240, magentas: 300 };
+  function hsDefaults() {
+    const o = { colorize: 0, ch: 0, cs: 25, cl: 0, master: { hue: 0, sat: 0, light: 0 } };
+    HS_RANGES.forEach(k => { const c = HS_CENTER[k]; o[k] = { hue: 0, sat: 0, light: 0, r: [c - 45, c - 15, c + 15, c + 45] }; });
+    return o;
   }
 
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -65,6 +88,16 @@
   const normalize = p => mergeInto(defaults(), p);
   const DEFAULT_JSON = JSON.stringify(defaults());
   const isNeutral = p => JSON.stringify(normalize(p)) === DEFAULT_JSON;
+  // the grade as the picture gets it: everything at its default while the whole grade is off, a switched-off section at its defaults;
+  // the values themselves stay in the grade. The renderer draws this, so every caller (the board's cards, a frame's render, the image
+  // studio's layers) leaves out what is off; isNeutral(effective(p)) tells a grade that changes nothing
+  function effective(p) {
+    const n = normalize(p), d = defaults();
+    if (n.bypass) return d;
+    for (const k in SECTION_PATHS) if (n.off[k]) SECTION_PATHS[k].forEach(path => setPath(n, path, clone(getPath(d, path))));
+    n.off = d.off;   // what is drawn: the switches themselves are not
+    return n;
+  }
 
   function getPath(o, path) { return path.split('.').reduce((a, k) => (a == null ? a : a[k]), o); }
   function setPath(o, path, v) {
@@ -103,6 +136,133 @@
       vignette: { amount: -16, midpoint: 45, roundness: 0, feather: 60 }
     }
   };
+
+  // which preset a grade holds: its values without the switches (a section off or the whole grade off is still that preset), else null.
+  // The panel's Presets menu puts its mark by it, the image studio's Adjustments list chooses its tile by it (owner 2026-10-07)
+  const presetVals = p => JSON.stringify(Object.assign({}, normalize(p), { bypass: 0, off: defaults().off }));
+  function presetOf(p) { const v = presetVals(p); return Object.keys(presets).find(n => presetVals(presets[n]) === v) || null; }
+  // A preset shown while it is pointed at (owner 2026-10-06: «when I hover the presets they apply at once»), one for the panel's menu and
+  // the image studio's list: show(name) puts the preset in (the grade from before is kept aside once), show(null) puts that grade back,
+  // end(keep) finishes: keep leaves the picture as it is for the click's own change, which follows at once
+  //   presetHover({ current() -> grade, apply(grade), preview(grade | null, keep) })
+  function presetHover(o) {
+    let base = null, at = null;
+    return {
+      show(name) {
+        if (name === at || (!name && !base)) return;
+        if (!base) base = o.current();
+        at = name; o.apply(name ? normalize(presets[name]) : base);
+        if (o.preview) o.preview(name ? o.current() : null);
+      },
+      end(keep) {
+        if (!base) return; const b = base; base = null; at = null;
+        if (!keep) o.apply(b);
+        if (o.preview) o.preview(null, !!keep);
+      },
+      get on() { return !!base; }
+    };
+  }
+  // A preset's swatch (owner 2026-10-07: «Warm Product» showed a teal swatch, «Cool Studio» an orange one): the preset itself applied by
+  // the same pass to one neutral sample, a grey ramp over a muted ramp of hues, so warm reads warm, black and white reads grey
+  function sample(w, h) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+    for (let i = 0; i < w; i++) {
+      const t = i / Math.max(1, w - 1), l = Math.round(14 + t * 82);
+      x.fillStyle = `hsl(0 0% ${l}%)`; x.fillRect(i, 0, 1, Math.ceil(h / 2));
+      x.fillStyle = `hsl(${Math.round(20 + t * 200)} 38% ${Math.round(30 + t * 40)}%)`; x.fillRect(i, Math.ceil(h / 2), 1, h - Math.ceil(h / 2));
+    }
+    return c;
+  }
+  let swR = null;
+  const swatches = new Map();
+  function swatch(name, w, h) {
+    const k = name + '|' + w + '|' + h; if (swatches.has(k)) return swatches.get(k);
+    if (!swR) swR = createRenderer();
+    const out = document.createElement('canvas'); swR.render(sample(w, h), presets[name] || {}, out);
+    swatches.set(k, out); return out;
+  }
+
+  // Hue/Saturation's own presets (its Preset menu, as Photoshop's list): only the hs part of the grade
+  const hsPresets = {
+    'Default': {},
+    'Cyanotype': { colorize: 1, ch: 210, cs: 25, cl: 0 },
+    'Increase Saturation': { master: { sat: 25 } },
+    'Further Increase Saturation': { master: { sat: 45 } },
+    'Strong Saturation': { master: { sat: 65 } },
+    'Old Style': { master: { sat: -55, light: 0 }, reds: { sat: 15 }, yellows: { hue: -5, sat: 20 } },
+    'Red Boost': { reds: { sat: 40 } },
+    'Sepia': { colorize: 1, ch: 35, cs: 25, cl: 0 },
+    'Yellow Boost': { yellows: { hue: -4, sat: 40 } }
+  };
+
+  /* ------------------------------------------------------- Hue/Saturation */
+  // The same maths as the shader's Hue/Saturation step, in plain JS on 0..1 RGB: the reference the tests compare the WebGL pass with, and
+  // what the panel's After bar shows. Photoshop's way: a range's weight comes from the pixel's own hue (1 inside b..c, a straight fade to
+  // a and to d, nothing for a grey); each range is applied by its weight, then Master: hue turns in HSL, saturation is Photoshop's
+  // (towards full colour without clipping the strongest one first, linear towards grey), lightness mixes towards white or black.
+  const rgb2hsl = (r, g, b) => {
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    if (d <= 0) return [0, 0, l];
+    const s = l < 0.5 ? d / (mx + mn) : d / (2 - mx - mn);
+    let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [h * 60, s, l];
+  };
+  const hsl2rgb = (h, s, l) => {
+    h = ((h % 360) + 360) % 360;
+    const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return [r + m, g + m, b + m];
+  };
+  function hsWeight(h, r) {
+    const [a, b, c, d] = r, x = a + (((h - a) % 360) + 360) % 360;
+    if (x < b) return (x - a) / (b - a);
+    if (x <= c) return 1;
+    if (x < d) return (d - x) / (d - c);
+    return 0;
+  }
+  function psSat(c, inc) {
+    const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]), d = mx - mn;
+    if (d <= 0 || !inc) return c;
+    const v = mx + mn, L = v / 2, S = L < 0.5 ? d / v : d / (2 - v);
+    if (inc > 0) { let a = inc + S >= 1 ? S : 1 - inc; a = 1 / a - 1; return c.map(x => x + (x - L) * a); }
+    return c.map(x => L + (x - L) * (1 + inc));
+  }
+  const clamp01 = v => Math.min(1, Math.max(0, v));
+  function hsStep(c, hue, sat, light) {
+    if (hue) { const q = rgb2hsl(c[0], c[1], c[2]); if (q[1] > 0) c = hsl2rgb(q[0] + hue, q[1], q[2]); }
+    if (sat) c = psSat(c, sat).map(clamp01);
+    if (light) c = c.map(x => light > 0 ? x * (1 - light) + light : x * (1 + light));
+    return c;
+  }
+  // r, g, b in 0..1, hs the grade's hs (normalized); returns [r, g, b]
+  function hsApply(rgb, hs) {
+    let c = rgb.slice(0, 3);
+    if (hs.colorize) {
+      const L = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+      c = hsl2rgb(hs.ch, hs.cs / 100, L);
+      return hsStep(c, 0, 0, hs.cl / 100).map(clamp01);
+    }
+    const mx = Math.max(c[0], c[1], c[2]), d = mx - Math.min(c[0], c[1], c[2]);
+    if (d > 0) {
+      const h = rgb2hsl(c[0], c[1], c[2])[0], grey = Math.min(1, d * 255 / 2);   // a near grey is barely in any range
+      for (const k of HS_RANGES) {
+        const o = hs[k]; if (!o.hue && !o.sat && !o.light) continue;
+        const w = hsWeight(h, hsRange(o.r)) * grey; if (w <= 0) continue;
+        const t = hsStep(c, o.hue, o.sat / 100, o.light / 100);
+        c = c.map((x, i) => x + (t[i] - x) * w);
+      }
+    }
+    return hsStep(c, hs.master.hue, hs.master.sat / 100, hs.master.light / 100).map(clamp01);
+  }
+  // a range as the shader takes it: four degrees, a ≤ b ≤ c ≤ d, d − a < 360 (a stored range that breaks it falls back to a sane one)
+  function hsRange(r) {
+    if (!Array.isArray(r) || r.length !== 4 || !r.every(v => isFinite(+v))) return [-45, -15, 15, 45];
+    let [a, b, c, d] = r.map(Number);
+    b = Math.max(a, b); c = Math.max(b, c); d = Math.max(c, d);
+    if (d - a >= 360) { const m = (b + c) / 2; a = Math.max(a, m - 179); d = Math.min(d, m + 179); b = Math.max(a, b); c = Math.min(c, d); }
+    return [a, b, c, d];
+  }
+  const hsUsed = hs => !!hs.colorize || ['master', ...HS_RANGES].some(k => hs[k].hue || hs[k].sat || hs[k].light);
 
   /* ---------------------------------------------------------------- CPU LUTs */
 
@@ -250,6 +410,11 @@ uniform vec2 uCgBB;      // blending 0..1, balance -1..1
 uniform vec3 uDetail;    // sharpen 0..1.5, radius px, noise 0..1
 uniform vec4 uVig;       // amount, midpoint, roundness, feather
 uniform vec3 uGrain;     // amount, size, roughness
+uniform int uUseHs;      // Hue/Saturation (hsApply above is the same maths in JS)
+uniform vec3 uHsM;       // Master: hue in degrees, saturation and lightness -1..1
+uniform vec3 uHsR[6];    // the six ranges' own hue, saturation, lightness
+uniform vec4 uHsB[6];    // their ranges a, b, c, d in degrees
+uniform vec4 uHsC;       // colorize: on, hue in degrees, saturation 0..1, lightness -1..1
 out vec4 outColor;
 
 const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
@@ -275,6 +440,40 @@ vec4 curveAt(float x){
   int i = int(i0), j = min(i + 1, 1023);
   return mix(texelFetch(uCurve, ivec2(i, 0), 0), texelFetch(uCurve, ivec2(j, 0), 0), f - i0);
 }
+
+vec3 rgb2hsl(vec3 c){
+  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), l = (mx + mn) * 0.5, d = mx - mn;
+  if (d <= 0.0) return vec3(0.0, 0.0, l);
+  float s = l < 0.5 ? d / (mx + mn) : d / (2.0 - mx - mn);
+  float h = mx == c.r ? (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0) : mx == c.g ? (c.b - c.r) / d + 2.0 : (c.r - c.g) / d + 4.0;
+  return vec3(h * 60.0, s, l);
+}
+vec3 hsl2rgb(vec3 q){
+  float h = mod(q.x, 360.0), c = (1.0 - abs(2.0 * q.z - 1.0)) * q.y, x = c * (1.0 - abs(mod(h / 60.0, 2.0) - 1.0)), m = q.z - c * 0.5;
+  vec3 r = h < 60.0 ? vec3(c, x, 0.0) : h < 120.0 ? vec3(x, c, 0.0) : h < 180.0 ? vec3(0.0, c, x) : h < 240.0 ? vec3(0.0, x, c) : h < 300.0 ? vec3(x, 0.0, c) : vec3(c, 0.0, x);
+  return r + m;
+}
+float hsWeight(float h, vec4 r){
+  float x = r.x + mod(h - r.x, 360.0);
+  if (x < r.y) return (x - r.x) / (r.y - r.x);
+  if (x <= r.z) return 1.0;
+  if (x < r.w) return (r.w - x) / (r.w - r.z);
+  return 0.0;
+}
+vec3 psSat(vec3 c, float inc){
+  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), d = mx - mn;
+  if (d <= 0.0 || inc == 0.0) return c;
+  float v = mx + mn, L = v * 0.5, S = L < 0.5 ? d / v : d / (2.0 - v);
+  if (inc > 0.0) { float a = inc + S >= 1.0 ? S : 1.0 - inc; a = 1.0 / a - 1.0; return c + (c - L) * a; }
+  return L + (c - L) * (1.0 + inc);
+}
+vec3 hsStep(vec3 c, vec3 a){
+  if (a.x != 0.0) { vec3 q = rgb2hsl(c); if (q.y > 0.0) c = hsl2rgb(vec3(q.x + a.x, q.y, q.z)); }
+  if (a.y != 0.0) c = clamp(psSat(c, a.y), 0.0, 1.0);
+  if (a.z != 0.0) c = a.z > 0.0 ? c * (1.0 - a.z) + a.z : c * (1.0 + a.z);
+  return c;
+}
+${SC.GLSL}
 
 float hash(ivec2 p){
   uvec2 q = uvec2(p + ivec2(4096));
@@ -416,6 +615,28 @@ void main(){
     c = l + (c - l) * max(0.0, 1.0 + a.y);
     c = a.z < 0.0 ? c * (1.0 + a.z * 0.7) : c + (1.0 - c) * a.z * 0.45;
   }
+
+  // Hue/Saturation (Photoshop's): the ranges by the pixel's own hue, then Master; or Colorize
+  if (uUseHs == 1) {
+    c = clamp(c, 0.0, 1.0);
+    if (uHsC.x > 0.5) {
+      float L = dot(c, vec3(0.299, 0.587, 0.114));
+      c = hsStep(hsl2rgb(vec3(uHsC.y, uHsC.z, L)), vec3(0.0, 0.0, uHsC.w));
+    } else {
+      float d = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+      if (d > 0.0) {
+        float h = rgb2hsl(c).x, grey = min(1.0, d * 127.5);
+        for (int k = 0; k < 6; k++) {
+          if (uHsR[k] == vec3(0.0)) continue;
+          float w = hsWeight(h, uHsB[k]) * grey;
+          if (w > 0.0) c = mix(c, hsStep(c, uHsR[k]), w);
+        }
+      }
+      c = hsStep(c, uHsM);
+    }
+    c = clamp(c, 0.0, 1.0);
+  }
+  ${SC.STEP}
 
   // Color Grading: shadows / midtones / highlights / global
   if (uUseGrade == 1) {
@@ -587,7 +808,7 @@ void main(){
     function render(src, params, out, opts) {
       opts = opts || {};
       if (lost || !src) return out || canvas;
-      const p = normalize(params);
+      const p = effective(params);
       const [w, h] = srcSize(src);
       if (!w || !h) return out || canvas;
       const max = maxTex || (maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE));
@@ -667,6 +888,15 @@ void main(){
       const v = p.vignette;
       gl.uniform4f(U(P, 'uVig'), v.amount / 100, v.midpoint / 100, v.roundness / 100, v.feather / 100);
       gl.uniform3f(U(P, 'uGrain'), p.grain.amount / 100, p.grain.size / 100, p.grain.roughness / 100);
+      const hs = p.hs, useHs = hsUsed(hs);
+      gl.uniform1i(U(P, 'uUseHs'), useHs ? 1 : 0);
+      if (useHs) {
+        gl.uniform3f(U(P, 'uHsM'), hs.master.hue, hs.master.sat / 100, hs.master.light / 100);
+        gl.uniform3fv(U(P, 'uHsR'), HS_RANGES.flatMap(k => [hs[k].hue, hs[k].sat / 100, hs[k].light / 100]));
+        gl.uniform4fv(U(P, 'uHsB'), HS_RANGES.flatMap(k => hsRange(hs[k].r)));
+        gl.uniform4f(U(P, 'uHsC'), hs.colorize ? 1 : 0, hs.ch, hs.cs / 100, hs.cl / 100);
+      }
+      SC.uniforms(gl, n => U(P, n), p.sc);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       if (out && out !== canvas) {
@@ -738,52 +968,63 @@ void main(){
   };
 
   const CSS = `
-.hcg{--ease:cubic-bezier(.3,.8,.25,1);position:relative;display:flex;flex-direction:column;width:100%;height:100%;min-height:0;
+.hcg{--ease:cubic-bezier(.3,.8,.25,1);--ease2:cubic-bezier(.32,.72,0,1);position:relative;display:flex;flex-direction:column;width:100%;height:100%;min-height:0;
   background:var(--paper);color:var(--ink);font:500 12px/1.3 Geist,ui-sans-serif,system-ui,-apple-system,sans-serif;
   -webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;box-sizing:border-box}
 .hcg *,.hcg *::before,.hcg *::after{box-sizing:border-box}
-.hcg button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer}
+/* the buttons' reset weighs nothing (:where), so a control's own class keeps its padding (owner 2026-10-06: «Presets ⌄» and the
+   Hue/Saturation select had their words against the capsule's edge, this reset outweighed their padding) */
+:where(.hcg) button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer}
 .hcg svg{display:block;flex:none}
 .hcg-top{display:flex;align-items:center;gap:2px;height:44px;padding:0 8px 0 14px;border-bottom:1px solid var(--line);flex:none}
 .hcg-title{flex:1;font-weight:600;font-size:13px;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hcg-ib{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--sub);
+.hcg-ib{width:28px;height:28px;border-radius:var(--r-ctl,8px);display:grid;place-items:center;color:var(--sub);
   transition:background .2s var(--ease),color .2s var(--ease),transform .2s var(--ease)}
 .hcg-ib svg{width:16px;height:16px}
-.hcg-ib:hover{background:rgba(255,255,255,.055);color:var(--ink)}
+.hcg-ib:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
 .hcg-ib:active{transform:scale(.92)}
 .hcg-ib.on{background:var(--raise2);color:var(--ink)}
-.hcg-pbtn{height:28px;padding:0 8px 0 10px;border-radius:8px;display:flex;align-items:center;gap:4px;color:var(--sub);
+.hcg-pbtn{height:28px;padding:0 calc(var(--hy-cap-pad,10px) - 2px) 0 var(--hy-cap-pad,10px);border-radius:var(--r-ctl,8px);display:flex;align-items:center;gap:4px;color:var(--sub);
   transition:background .2s var(--ease),color .2s var(--ease)}
-.hcg-pbtn:hover,.hcg-pbtn.on{background:rgba(255,255,255,.055);color:var(--ink)}
+.hcg-pbtn:hover,.hcg-pbtn.on{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
 .hcg-pbtn .hcg-chev{width:11px;height:11px;transform:rotate(90deg)}
-.hcg-menu{position:absolute;right:8px;top:40px;z-index:5;min-width:180px;padding:4px;border-radius:10px;background:var(--panel);
-  border:1px solid var(--line);box-shadow:0 2px 6px rgba(0,0,0,.35),0 18px 48px rgba(0,0,0,.5);
+.hcg-menu{position:absolute;right:8px;top:40px;z-index:5;min-width:180px;padding:6px;border-radius:var(--r-panel,10px);background:var(--panel);
+  border:1px solid var(--line);box-shadow:var(--plate-sh,0 2px 6px rgba(0,0,0,.35),0 18px 48px rgba(0,0,0,.5));
   opacity:0;transform:translateY(-4px) scale(.98);transform-origin:top right;pointer-events:none;
   transition:opacity .18s var(--ease),transform .2s var(--ease)}
 .hcg-menu.open{opacity:1;transform:none;pointer-events:auto}
 .hcg-menu .mt{padding:6px 8px 4px;color:var(--muted);font:600 10.5px Geist,ui-sans-serif,sans-serif;letter-spacing:.06em;text-transform:uppercase}
-.hcg-menu button{display:flex;align-items:center;gap:8px;width:100%;height:28px;padding:0 8px;border-radius:6px;text-align:left;
+.hcg-menu button{display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 10px;border-radius:var(--r-row,6px);text-align:left;
   transition:background .15s var(--ease)}
-.hcg-menu button:hover{background:var(--raise2)}
+.hcg-menu button:hover{background:var(--raise)}
 .hcg-menu button .ck{width:14px;color:var(--sel);opacity:0;transition:opacity .15s}
 .hcg-menu button.cur .ck{opacity:1}
 .hcg-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--raise2) transparent;padding-bottom:24px}
 .hcg-sec{border-bottom:1px solid var(--line)}
 .hcg-head{display:flex;align-items:center;gap:9px;height:40px;padding:0 10px 0 14px;cursor:pointer;color:var(--sub);
   transition:color .2s var(--ease),background .2s var(--ease)}
-.hcg-head:hover{color:var(--ink);background:rgba(255,255,255,.02)}
+.hcg-head:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 2%,transparent)}
 .hcg-sec.open>.hcg-head{color:var(--ink)}
 .hcg-head .ic{width:15px;height:15px;opacity:.9}
-.hcg-head .t{flex:1;font-weight:600;font-size:12.5px}
+.hcg-head .t{flex:1;min-width:0;font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hcg-head .dot{width:5px;height:5px;border-radius:50%;background:var(--sel);opacity:0;transform:scale(.4);transition:opacity .2s var(--ease),transform .25s var(--ease)}
 .hcg-sec.mod .hcg-head .dot{opacity:1;transform:none}
-.hcg-head .rs{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--muted);opacity:0;pointer-events:none;
-  transition:opacity .2s var(--ease),background .15s var(--ease),color .15s var(--ease)}
-.hcg-sec.mod .hcg-head:hover .rs{opacity:1;pointer-events:auto}
-.hcg-head .rs:hover{background:var(--raise2);color:var(--ink)}
+.hcg-head .rs{width:24px;height:24px;border-radius:var(--r-ctl,6px);display:grid;place-items:center;color:var(--muted);opacity:0;scale:.6;pointer-events:none;
+  transition:opacity .24s var(--ease2),scale .32s var(--ease2),background .15s var(--ease),color .15s var(--ease)}
+.hcg-sec.mod .hcg-head:hover .rs{opacity:1;scale:1;pointer-events:auto}
+.hcg-head .rs:hover,.hcg-head .ey:hover{background:var(--raise2);color:var(--ink)}
+.hcg-head .ey{width:24px;height:24px;border-radius:var(--r-ctl,6px);display:grid;place-items:center;color:var(--muted);transition:background .15s var(--ease),color .15s var(--ease)}
+.hcg-head .ey svg,.hcg-eye svg{width:15px;height:15px}
+.hcg-sec.off .hcg-head .ey{color:var(--ink)}
+/* off (owner 2026-10-06: «it is not clear at all» that the grade is off): what is off fades, colour and strength, by a filter on the
+   blocks, never by other colours; the eyes and the close button stay as they are, to switch back */
+.hcg-scroll,.hcg-title,.hcg-pbtn,.hcg-rall,.hcg-head>.ic,.hcg-head>.t{transition:filter .32s var(--ease2),opacity .32s var(--ease2)}
+.hcg.byp .hcg-scroll,.hcg.byp .hcg-title,.hcg.byp .hcg-pbtn,.hcg.byp .hcg-rall,.hcg-sec.off>.hcg-body{filter:saturate(0);opacity:.4}
+.hcg-sec.off>.hcg-head>.ic,.hcg-sec.off>.hcg-head>.t{opacity:.45}
+.hcg.byp .hcg-eye{color:var(--ink);background:var(--raise2)}
 .hcg-head .hcg-chev{width:12px;height:12px;color:var(--muted);transition:transform .25s var(--ease)}
 .hcg-sec.open>.hcg-head .hcg-chev{transform:rotate(90deg)}
-.hcg-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s var(--ease)}
+.hcg-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s var(--ease),filter .32s var(--ease2),opacity .32s var(--ease2)}
 .hcg-sec.open>.hcg-body{grid-template-rows:1fr}
 .hcg-inner{min-height:0;overflow:hidden;opacity:0;transition:opacity .22s var(--ease)}
 .hcg-sec.open .hcg-inner{opacity:1}
@@ -791,36 +1032,21 @@ void main(){
 .hcg-sub{display:flex;align-items:center;gap:8px;margin:12px 0 4px;color:var(--muted);font:600 10.5px Geist,ui-sans-serif,sans-serif;letter-spacing:.06em;text-transform:uppercase}
 .hcg-sub::after{content:"";flex:1;height:1px;background:var(--line)}
 .hcg-sub:first-child{margin-top:6px}
-.hcg-row{padding:5px 0 1px}
-.hcg-lab{display:flex;align-items:center;justify-content:space-between;height:18px;color:var(--sub);transition:color .15s var(--ease)}
-.hcg-row:hover .hcg-lab,.hcg-row.drag .hcg-lab{color:var(--ink)}
-.hcg-num{width:56px;height:20px;margin-right:-4px;padding:0 4px;border:1px solid transparent;border-radius:5px;background:transparent;
-  color:var(--ink);font:500 12px/1 Geist,ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:right;outline:none;cursor:text;
-  transition:background .15s var(--ease),border-color .15s var(--ease)}
-.hcg-num{user-select:text;-webkit-user-select:text}
-.hcg-num:hover{background:var(--raise)}
-.hcg-num:focus{background:var(--panel);border-color:var(--sel)}
-.hcg-trk{position:relative;height:18px;cursor:pointer;touch-action:none;outline:none}
-.hcg-rail{position:absolute;left:0;right:0;top:7px;height:4px;border-radius:2px;background:var(--raise2)}
-.hcg-trk.grad .hcg-rail{height:5px;top:6.5px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
-.hcg-fill{position:absolute;top:7px;height:4px;border-radius:2px;background:var(--sel);opacity:.85;transition:opacity .2s var(--ease)}
-.hcg-trk.grad .hcg-fill{display:none}
-.hcg-zero{position:absolute;left:50%;top:4px;width:1px;height:10px;margin-left:-.5px;background:var(--muted);opacity:.55}
-.hcg-thumb{position:absolute;top:3px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--ink);
-  box-shadow:0 0 0 1px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.5);transition:transform .15s var(--ease),box-shadow .15s var(--ease)}
-.hcg-trk:hover .hcg-thumb{transform:scale(1.12)}
-.hcg-row.drag .hcg-thumb{transform:scale(1.25)}
-.hcg-trk:focus-visible .hcg-thumb{box-shadow:0 0 0 2px var(--sel),0 1px 3px rgba(0,0,0,.5)}
-.hcg-row.anim .hcg-thumb{transition:left .22s var(--ease),transform .15s var(--ease)}
-.hcg-row.anim .hcg-fill{transition:left .22s var(--ease),width .22s var(--ease)}
-.hcg-seg{display:flex;gap:2px;padding:2px;margin:6px 0 8px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
-.hcg-seg button{flex:1 1 auto;min-width:0;padding:0 5px;height:24px;border-radius:6px;color:var(--sub);font-size:11px;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;
+.hcg-row{padding:2px 0}
+.hcg .hy-slider{--hy-sl-h:28px;font-size:12px}   /* the app's one slider (ui/slider.css) at this panel's row height */
+.hcg .hy-slider-ed{user-select:text;-webkit-user-select:text}
+.hcg-rail{position:absolute;left:0;right:0;top:7px;height:4px;border-radius:2px;background:var(--raise2)}   /* the tone split's rail */
+/* a choice: its track var(--hy-seg-pad) around the options, each option's corners the track's less that inset (concentric) and its
+   words 6 px from its ends (owner 2026-10-06: the app's one segmented rule, ui/look.css .seg) */
+.hcg-seg{display:flex;gap:0;padding:var(--hy-seg-pad,3px);margin:6px 0 8px;border-radius:var(--r-ctl,8px);background:var(--raise)}
+.hcg-seg button{flex:1 1 auto;min-width:0;padding:0 6px;height:24px;border-radius:max(0px,calc(var(--r-ctl,8px) - var(--hy-seg-pad,3px)));color:var(--sub);font-size:11px;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;
   transition:background .2s var(--ease),color .2s var(--ease)}
 .hcg-seg button:hover{color:var(--ink)}
-.hcg-seg button.on{background:var(--raise2);color:var(--ink)}
-.hcg-seg .sw{width:7px;height:7px;border-radius:50%}
+.hcg-seg button.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12),0 0 0 1px var(--line)}
+.hcg-seg .sw{width:7px;height:7px;border-radius:50%;flex:none}   /* a dot stays a dot when the words are long (Russian) */
+.hcg-seg button.dot{flex:0 0 32px}.hcg-seg button.dot .sw{width:9px;height:9px}   /* a channel by its colour alone, its name in the tooltip */
 .hcg-cv{position:relative;margin:2px 0 4px}
-.hcg-cv canvas{display:block;width:100%;border-radius:6px;touch-action:none;cursor:crosshair}
+.hcg-cv canvas{display:block;width:100%;border-radius:var(--r-box,6px);touch-action:none;cursor:crosshair}
 .hcg-readout{position:absolute;left:8px;top:6px;font:500 10.5px/1 Geist,ui-sans-serif,sans-serif;font-variant-numeric:tabular-nums;color:var(--sub);
   opacity:0;transition:opacity .2s var(--ease);pointer-events:none}
 .hcg-cv.show .hcg-readout{opacity:1}
@@ -838,23 +1064,58 @@ void main(){
 .hcg-wheel .wv{color:var(--muted);font-variant-numeric:tabular-nums}
 .hcg-wheel canvas{display:block;touch-action:none;cursor:crosshair;border-radius:50%}
 .hcg-wheel .hcg-row{align-self:stretch}
+.hcg-wheel .hy-slider-l{max-width:calc(100% - 40px)}   /* under a wheel the number is at most «100»: the label gets the room (owner 2026-10-07: «Светимость» was cut) */
+/* Hue/Saturation (owner 2026-10-06, Photoshop's Properties › Hue/Saturation in the app's look): the preset select, the range swatches
+   with the eyedroppers, the app's sliders, Colorize, the Before-After bars with the range's marks; rows take the app's row radius */
+.hcg button:focus,.hcg button:focus-visible{outline:none}
+.hcg-hsp{display:flex;align-items:center;gap:8px;margin:6px 0 8px}
+.hcg-hsp .l{color:var(--sub);font-size:11.5px;flex:none}
+.hcg-sel{flex:1;min-width:0;height:28px;padding:0 calc(var(--hy-cap-pad,10px) - 1px) 0 calc(var(--hy-cap-pad,10px) + 2px);border-radius:var(--hy-row-r,var(--r-ctl,8px));background:color-mix(in srgb,var(--ink) 7%,transparent);display:flex;align-items:center;gap:6px;color:var(--ink);
+  transition:background .25s var(--ease)}
+.hcg-sel:hover,.hcg-sel.on{background:color-mix(in srgb,var(--ink) 11%,transparent)}
+.hcg-sel span{flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hcg-sel .hcg-chev{width:11px;height:11px;color:var(--muted);transform:rotate(90deg);transition:transform .25s var(--ease)}
+.hcg-sel.on .hcg-chev{transform:rotate(-90deg)}
+.hcg-hsm{position:absolute;z-index:6;min-width:200px;padding:6px;border-radius:var(--r-panel,10px);background:var(--panel);border:1px solid var(--line);
+  box-shadow:var(--plate-sh,0 2px 6px rgba(0,0,0,.35),0 18px 48px rgba(0,0,0,.5));opacity:0;transform:translateY(-4px) scale(.98);transform-origin:top left;pointer-events:none;
+  transition:opacity .18s var(--ease),transform .2s var(--ease)}
+.hcg-hsm.open{opacity:1;transform:none;pointer-events:auto}
+.hcg-hsm button{display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 10px;border-radius:var(--r-row,6px);text-align:left;transition:background .15s var(--ease)}
+.hcg-hsm button:hover{background:var(--raise)}
+.hcg-hsm button .ck{width:14px;color:var(--sel);opacity:0;transition:opacity .15s}
+.hcg-hsm button.cur .ck{opacity:1}
+.hcg-hsr{display:flex;align-items:center;gap:5px;margin:4px 0 2px}
+.hcg-sw{position:relative;width:20px;height:20px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18);transition:box-shadow .2s var(--ease),transform .2s var(--ease)}
+.hcg-sw:hover{transform:scale(1.08)}
+.hcg-sw.on{box-shadow:0 0 0 2px var(--paper,var(--panel)),0 0 0 3.5px var(--ink)}
+.hcg-sw.mod::after{content:"";position:absolute;left:50%;bottom:-6px;width:3px;height:3px;margin-left:-1.5px;border-radius:50%;background:var(--sel)}
+.hcg-sw.master{background:conic-gradient(from 90deg,hsl(0 85% 55%),hsl(60 85% 55%),hsl(120 75% 48%),hsl(180 75% 48%),hsl(240 80% 60%),hsl(300 80% 58%),hsl(360 85% 55%))}
+.hcg-hsr .sp{flex:1}
+.hcg-hsr .hcg-ib{width:26px;height:26px}
+.hcg-hsr .hcg-ib.on{background:var(--sel);color:#fff}
+.hcg-hsr.dis .hcg-sw:not(.master),.hcg-hsr.dis .hcg-ib{opacity:.35;pointer-events:none}
+.hcg-hsn{color:var(--muted);font-size:11px;margin:6px 0 4px;min-height:14px}
+.hcg-ck{display:inline-flex;align-items:center;gap:7px;height:28px;margin:4px 0 2px;padding:0 10px 0 8px;border-radius:var(--hy-row-r,var(--r-ctl,8px));color:var(--sub);
+  transition:background .18s var(--ease),color .18s var(--ease)}
+.hcg-ck:hover{background:var(--raise);color:var(--ink)}
+.hcg-ck i{width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--muted);display:grid;place-items:center;transition:background .2s var(--ease),box-shadow .2s var(--ease)}
+.hcg-ck i svg{width:11px;height:11px;color:#fff;opacity:0;transform:scale(.6);transition:opacity .18s var(--ease),transform .25s var(--ease)}
+.hcg-ck.on{color:var(--ink)}
+.hcg-ck.on i{background:var(--sel);box-shadow:none}
+.hcg-ck.on i svg{opacity:1;transform:none}
+.hcg-ba{position:relative;margin:8px 0 2px}
+.hcg-ba canvas{display:block;width:100%;height:46px;touch-action:none}
+.hcg-ba .rd{display:flex;justify-content:space-between;margin-top:3px;color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums;min-height:13px}
 .hcg-fade{animation:hcgFade .24s var(--ease)}
 @keyframes hcgFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 `;
 
-  const ICON = {
-    basic: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-    curve: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M6 18C10 18 9 6 18 6"/>',
-    detail: '<path d="M12 3 3 19h18z"/><path d="M8.5 13h7"/>',
-    mixer: '<circle cx="9" cy="9" r="5.5"/><circle cx="15" cy="9" r="5.5"/><circle cx="12" cy="15" r="5.5"/>',
-    grading: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none" opacity=".35"/><circle cx="15" cy="9" r="1.6"/>',
-    effects: '<rect x="3" y="4" width="18" height="16" rx="3"/><ellipse cx="12" cy="12" rx="5" ry="4"/>',
-    reset: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
-    split: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16"/><path d="M12 4h6.5A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5H12z" fill="currentColor" stroke="none" opacity=".35"/>',
-    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>'
-  };
-  const svg = (body, cls, sw) => `<svg class="${cls || 'ic'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw || 1.7}" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
-  const CHEV = '<svg class="hcg-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+  // the panel's icons are the app's (ui/icons.js hyIcon, owner 2026-10-07: «одно значение, одна иконка»): a section by its id, a button by
+  // its meaning; Color Grading's section is its three wheels, not the half circle (that is the opacity's)
+  const SEC_ICON = { basic: 'rawLight', curve: 'rawCurve', detail: 'rawDetail', mixer: 'rawMixer', hs: 'rawHueSat',   // hy-icon-names
+    sc: 'rawSelColor', grading: 'rawGrading', effects: 'rawEffects' };
+  const svg = (name, cls, sw) => global.hyIcon ? global.hyIcon(name, 0, sw || 1.8, cls || 'ic') : '';
+  const CHEV = global.hyIcon ? global.hyIcon('chevron', 0, 2.4, 'hcg-chev') : '';
 
   const TRACK = {
     temp: 'linear-gradient(90deg,#2f6fe0,#8fb2e6 35%,#d6d3c8 50%,#e8d27a 65%,#f0b62a)',
@@ -912,12 +1173,22 @@ void main(){
     injectCSS();
     let state = normalize(params);
     const DEF = defaults();
+    // the words of the newer sections through the host's language (opts.t: the board's or the image studio's, lang.js); English without it
+    const L = k => { try { return opts.t ? opts.t(k) : k; } catch (e) { return k; } };
+    // a shorter word where a row of options has no room for the full one («short::Hue» is «Тон» in Russian; English and a language
+    // without it keep the full word)
+    const SHORT = new Set(['Hue', 'Selective Color']);   // the words lang.js has a «short::» form of (a title: its full name in the tooltip)
+    const Ls = k => { if (!SHORT.has(k)) return L(k); const v = L('short::' + k); return !v || v.includes('short::') ? L(k) : v; };
     const listeners = [];
     const on = (t, ev, fn, o) => { t.addEventListener(ev, fn, o); listeners.push(() => t.removeEventListener(ev, fn, o)); };
 
     const root = el('div', 'hcg');
-    const theme = opts.theme && typeof opts.theme === 'object' ? Object.assign({}, DARK, opts.theme) : DARK;
-    for (const k in theme) root.style.setProperty(k, theme[k]);
+    // theme 'inherit': the page's own palette and corners (the frame editor's, which are the app's: owner 2026-10-06); otherwise dark,
+    // or dark with the given tokens over it
+    if (opts.theme !== 'inherit') {
+      const theme = opts.theme && typeof opts.theme === 'object' ? Object.assign({}, DARK, opts.theme) : DARK;
+      for (const k in theme) root.style.setProperty(k, theme[k]);
+    }
     container.appendChild(root);
 
     // rAF-throttled change notification
@@ -928,52 +1199,75 @@ void main(){
       pending = requestAnimationFrame(() => { pending = 0; if (onChange) onChange(clone(state)); });
     }
 
+    const panelApi = {};   // what a section adds to the panel's object (Hue/Saturation: hs.pick, hs.select)
     const controls = [];   // each: {update()}
     const redraws = [];    // canvases that depend on width
 
     /* -- top bar -- */
     const top = el('div', 'hcg-top');
-    const title = el('div', 'hcg-title', opts.title || 'Color Grading');
-    const baBtn = el('button', 'hcg-ib', svg(ICON.split));
-    baBtn.title = 'Toggle Before/After  (\\)';
-    const pBtn = el('button', 'hcg-pbtn', 'Presets' + CHEV);
-    const rBtn = el('button', 'hcg-ib', svg(ICON.reset));
-    rBtn.title = 'Reset all';
+    const title = el('div', 'hcg-title', opts.title || 'Raw Editor');   // its name in both languages (owner 2026-10-06)
+    // the whole grade on and off, its values kept (owner 2026-10-06: the split icon said nothing about it): an eye, open while the grade
+    // works, crossed out while it is off; the panel below fades then (.byp). \\ as before
+    const baBtn = el('button', 'hcg-ib hcg-eye');
+    const pBtn = el('button', 'hcg-pbtn', L('Presets') + CHEV);
+    const rBtn = el('button', 'hcg-ib hcg-rall', svg('reset'));
+    rBtn.title = L('Reset all');
     top.append(title, pBtn, baBtn, rBtn);
     root.appendChild(top);
 
-    const menu = el('div', 'hcg-menu');
-    menu.appendChild(el('div', 'mt', 'Presets'));
+    const menu = el('div', 'hcg-menu'); menu.dataset.hymenu = '';
+    menu.appendChild(el('div', 'mt', L('Presets')));
     const presetBtns = [];
+    // A preset shows on the picture and in the sliders while it is pointed at or reached with ↑ ↓ (owner 2026-10-06: «when I hover the
+    // presets they apply at once»): opts.preview(grade) draws it on the picture without changing anything kept, the next item swaps it,
+    // leaving the list puts back what was there, closing the menu without a click too (Esc, a click elsewhere). A click keeps it: one
+    // change, so one undo step; the hovers are none and nothing is saved for them. Without opts.preview the menu only applies on click
+    const pv = presetHover({ current: () => clone(state), apply: g => setState(g, false), preview: (g, keep) => opts.preview(g, keep) });
+    function pvShow(name) { if (opts.preview) pv.show(name); }
+    // keep: the click's own change follows at once, so the picture is left as it is until then
+    function pvEnd(keep) { pv.end(keep); }
     Object.keys(presets).forEach(name => {
-      const b = el('button', '', svg(ICON.check, 'ck', 2.2) + `<span>${name}</span>`);
-      on(b, 'click', () => { setState(normalize(presets[name]), true); closeMenu(); emit(); });
+      const b = el('button', '', svg('check', 'ck', 2.2) + `<span>${L(name)}</span>`); b.dataset.k = name;   // the words in the page's language, the English name to find it by
+      on(b, 'click', () => { pvEnd(true); setState(normalize(presets[name]), true); closeMenu(); emit(); });
+      on(b, 'pointerenter', () => pvShow(name)); on(b, 'focus', () => pvShow(name));
       menu.appendChild(b); presetBtns.push([name, b]);
     });
+    on(menu, 'pointerleave', () => { if (!menu.contains(document.activeElement)) pvShow(null); });
     root.appendChild(menu);
-    const closeMenu = () => { menu.classList.remove('open'); pBtn.classList.remove('on'); };
+    // a closed menu keeps its place (it fades), so its items lose their role: the app's menu keys (ui/menu.js: ↑ ↓ Enter) take only an open one
+    const closeMenu = () => { pvEnd(false); menu.classList.remove('open'); pBtn.classList.remove('on'); if (menu.contains(document.activeElement)) document.activeElement.blur(); presetBtns.forEach(([, b]) => b.removeAttribute('role')); };
+    // the values without the switches: a preset is checked while the panel holds its values, a section off or not
+    const vals = presetVals;
     on(pBtn, 'click', e => {
       e.stopPropagation();
-      const cur = JSON.stringify(state);
-      presetBtns.forEach(([n, b]) => b.classList.toggle('cur', JSON.stringify(normalize(presets[n])) === cur));
+      const cur = vals(state);
+      presetBtns.forEach(([n, b]) => b.classList.toggle('cur', vals(presets[n]) === cur));
       const open = !menu.classList.contains('open');
-      menu.classList.toggle('open', open); pBtn.classList.toggle('on', open);
+      if (!open) return closeMenu();
+      menu.classList.add('open'); pBtn.classList.add('on'); presetBtns.forEach(([, b]) => b.setAttribute('role', 'menuitem'));
     });
     on(document, 'pointerdown', e => { if (!menu.contains(e.target) && e.target !== pBtn && !pBtn.contains(e.target)) closeMenu(); });
     on(rBtn, 'click', () => { setState(defaults(), true); emit(); });
 
-    let before = false;
-    function setBefore(b) {
-      before = !!b; baBtn.classList.toggle('on', before);
-      if (opts.onBeforeAfter) opts.onBeforeAfter(before);
+    // the app's eye (ui/icons.js), the same as in the image studio's layer list; a page without it keeps the old split icon
+    const EYE = 'eye', EYEOFF = 'eyeoff';
+    function eye(b, shown, title) {
+      if (b._on !== shown) { b._on = shown; b.innerHTML = svg(shown ? EYE : EYEOFF, 'ic', 1.85); }
+      b.title = title; b.setAttribute('aria-label', title); b.setAttribute('aria-pressed', String(!shown));
     }
-    on(baBtn, 'click', () => setBefore(!before));
+    // Before (the old split): now the grade switched off, a change of the grade (one step to undo, saved with it)
+    function setBefore(b) {
+      b = b ? 1 : 0; if (b === state.bypass) return;
+      state.bypass = b; emit();
+      if (opts.onBeforeAfter) opts.onBeforeAfter(!!b);
+    }
+    on(baBtn, 'click', () => setBefore(!state.bypass));
     on(window, 'keydown', e => {
-      if (e.key === 'Escape') closeMenu();
+      if (e.key === 'Escape' && menu.classList.contains('open')) closeMenu();
       if (e.key !== '\\' || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      e.preventDefault(); setBefore(!before);
+      e.preventDefault(); setBefore(!state.bypass);
     });
 
     const scroll = el('div', 'hcg-scroll');
@@ -981,18 +1275,28 @@ void main(){
 
     /* -- sections -- */
     const sections = [];
+    // Photoshop's eye drag over the sections' eyes (Hyimg's ui/eyedrag.js, owner 2026-10-07): a press switches a section, the sections
+    // passed while held take the same state; the host makes the press one step to undo. A click from the keys keeps the eye's own click
+    if (global.hyEyeDrag) {
+      const secOf = b => sections.find(x => x.ey === b);
+      global.hyEyeDrag(scroll, { selector: '.hcg-head .ey', get: b => { const x = secOf(b); return !!x && !state.off[x.id]; },
+        set: (b, on) => { const x = secOf(b); if (!x) return; state.off[x.id] = on ? 0 : 1; emit(); } });
+    }
     function section(id, name, paths, openByDefault) {
+      const shown = Ls(name); name = L(name);   // every word of the panel in the page's language (owner 2026-10-06: «Basic», «Tone» … in Russian)
       const sec = el('section', 'hcg-sec' + (openByDefault ? ' open' : ''));
       sec.dataset.id = id;
-      const head = el('div', 'hcg-head', svg(ICON[id]) + `<span class="t">${name}</span><span class="dot"></span>`);
-      const rs = el('button', 'rs', svg(ICON.reset, 'ic', 1.9));
-      rs.title = 'Reset ' + name;
-      head.append(rs);
+      const head = el('div', 'hcg-head', svg(SEC_ICON[id]) + `<span class="t">${shown}</span><span class="dot"></span>`); head.title = name;
+      const rs = el('button', 'rs', svg('reset', 'ic', 1.9));
+      rs.title = L('Reset') + ' · ' + name;
+      // the section's own eye, next to its chevron: off, the section leaves the picture and its values stay (owner 2026-10-06)
+      const ey = el('button', 'ey');
+      head.append(rs, ey);
       head.insertAdjacentHTML('beforeend', CHEV);
       const body = el('div', 'hcg-body'), inner = el('div', 'hcg-inner'), pad = el('div', 'hcg-pad');
       inner.appendChild(pad); body.appendChild(inner); sec.append(head, body);
       on(head, 'click', e => {
-        if (rs.contains(e.target)) return;
+        if (rs.contains(e.target) || ey.contains(e.target)) return;
         sec.classList.toggle('open');
         if (sec.classList.contains('open')) requestAnimationFrame(() => redraws.forEach(f => f()));
       });
@@ -1001,37 +1305,40 @@ void main(){
         paths.forEach(p => setPath(state, p, clone(getPath(DEF, p))));
         refreshAll(true); emit();
       });
+      on(ey, 'click', e => { e.stopPropagation(); state.off[id] = state.off[id] ? 0 : 1; emit(); });
       scroll.appendChild(sec);
-      sections.push({ sec, paths });
+      sections.push({ sec, paths, id, ey, name });
       return pad;
     }
     function refreshSections() {
-      sections.forEach(({ sec, paths }) => {
+      root.classList.toggle('byp', !!state.bypass);
+      eye(baBtn, !state.bypass, (state.bypass ? L('Turn on') : L('Turn off')) + ' · \\');
+      sections.forEach(({ sec, paths, id, ey, name }) => {
         sec.classList.toggle('mod', paths.some(p => JSON.stringify(getPath(state, p)) !== JSON.stringify(getPath(DEF, p))));
+        const off = !!state.off[id]; sec.classList.toggle('off', off);
+        eye(ey, !off, (off ? L('Turn on') : L('Turn off')) + ' ' + name);
       });
     }
 
-    /* -- slider -- */
+    /* -- slider: the app's one slider (ui/slider.js, owner 2026-10-06: sliders must be the same everywhere, as in 3D) -- */
     function slider(parent, o) {
-      // o: {path, label, min, max, step, dec, track}
+      // o: {path, label, min, max, step, dec, track}; the label is inside the slider, the number at its right (a click on it types: parseEntry's rule),
+      // a double click puts the default back, a signed range fills from zero, a colour track (o.track) shows its colours along the bottom edge
+      if (!global.hySlider) throw new Error('HyColorGrade needs the app\'s slider: <script src="/ui/slider.js">');
       const def = getPath(DEF, o.path);
       const step = o.step || 1, dec = o.dec || 0;
       const centered = o.min < 0 && o.max > 0;
       const row = el('div', 'hcg-row');
-      const lab = el('div', 'hcg-lab');
-      const name = el('span', '', o.label);
-      const num = el('input', 'hcg-num');
-      num.type = 'text'; num.spellcheck = false; num.inputMode = 'decimal';
-      num.title = 'Type a value: 10 sets it; +10 adds, -10 takes away, +10% adds a tenth, *2, /2; 1239+10 works too; an exact negative: 0-10';
-      lab.append(name, num);
-      const trk = el('div', 'hcg-trk' + (o.track ? ' grad' : ''));
-      trk.tabIndex = 0; trk.setAttribute('role', 'slider'); trk.setAttribute('aria-label', o.label);
-      const rail = el('div', 'hcg-rail'), fill = el('div', 'hcg-fill'), thumb = el('div', 'hcg-thumb');
-      if (o.track) rail.style.background = o.track;
-      trk.append(rail, fill);
-      if (centered) trk.appendChild(el('div', 'hcg-zero'));
-      trk.appendChild(thumb);
-      row.append(lab, trk);
+      const w = el('div', 'hy-slider' + (o.track ? ' grad' : ''));
+      const lab = L(o.label);   // the words in the page's language; data-k keeps the English name (the tests, an agent's selector)
+      const inp = el('input'); inp.type = 'range'; inp.min = o.min; inp.max = o.max; inp.step = step; inp.setAttribute('aria-label', lab); inp.dataset.k = o.label;
+      const num = el('output', 'hy-slider-v');
+      num.title = L('Type a value: 10 sets it; +10 adds, -10 takes away, +10% adds a tenth, *2, /2; 1239+10 works too; an exact negative: 0-10');
+      w.append(inp, el('span', 'hy-slider-l', lab), num);
+      if (centered) w.dataset.center = '0';
+      w.dataset.reset = String(def);
+      if (o.track) w.style.setProperty('--hy-sl-grad', o.track);
+      row.appendChild(w);
       parent.appendChild(row);
 
       const get = () => getPath(state, o.path);
@@ -1044,83 +1351,31 @@ void main(){
         v = Math.round(v / step) * step;
         return +v.toFixed(dec + 2);
       };
-      const frac = v => (v - o.min) / (o.max - o.min);
-      function update() {
-        const v = get(), f = frac(v) * 100;
-        thumb.style.left = f + '%';
-        if (centered) { const z = frac(0) * 100; fill.style.left = Math.min(z, f) + '%'; fill.style.width = Math.abs(f - z) + '%'; }
-        else { fill.style.left = '0%'; fill.style.width = f + '%'; }
-        if (document.activeElement !== num) num.value = fmt(v);
-        trk.setAttribute('aria-valuenow', v);
-      }
-      function setV(v, animate) {
-        v = quant(v);
-        if (v === get()) { update(); return; }
+      const sl = global.hySlider.mount(w);
+      sl.format = fmt;
+      sl.parse = (text, cur) => { const v = parseEntry(text, cur); return v == null ? NaN : v; };
+      function update() { inp.value = String(get()); sl.paint(); }
+      on(inp, 'input', () => {
+        const v = quant(+inp.value);
+        if (v === get()) return;
         setPath(state, o.path, v);
-        if (animate) { row.classList.add('anim'); clearTimeout(row._t); row._t = setTimeout(() => row.classList.remove('anim'), 260); }
-        update(); emit();
+        emit();
         if (o.onSet) o.onSet(v);
-      }
-      // pointer: grab the thumb (relative drag) or jump to the click position
-      let drag = null;
-      on(trk, 'pointerdown', e => {
-        if (e.button !== 0) return;
-        e.preventDefault(); trk.focus({ preventScroll: true });
-        const r = trk.getBoundingClientRect();
-        const tx = r.left + frac(get()) * r.width;
-        const onThumb = Math.abs(e.clientX - tx) <= 8;
-        drag = { r, off: onThumb ? e.clientX - tx : 0 };
-        trk.setPointerCapture(e.pointerId);
-        row.classList.add('drag');
-        if (!onThumb) setV(o.min + (e.clientX - r.left) / r.width * (o.max - o.min), true);
       });
-      on(trk, 'pointermove', e => {
-        if (!drag) return;
-        setV(o.min + (e.clientX - drag.off - drag.r.left) / drag.r.width * (o.max - o.min));
-      });
-      const end = () => { if (drag) { drag = null; row.classList.remove('drag'); } };
-      on(trk, 'pointerup', end); on(trk, 'pointercancel', end);
-      on(trk, 'dblclick', () => setV(def, true));
-      on(trk, 'keydown', e => {
-        const k = e.key, big = e.shiftKey ? 10 : 1;
-        if (k === 'ArrowRight' || k === 'ArrowUp') { e.preventDefault(); setV(get() + step * big); }
-        else if (k === 'ArrowLeft' || k === 'ArrowDown') { e.preventDefault(); setV(get() - step * big); }
-        else if (k === 'Home') setV(o.min, true);
-        else if (k === 'End') setV(o.max, true);
-      });
-      // number field
-      on(num, 'focus', () => { num.value = fmt(get()); requestAnimationFrame(() => num.select()); });
-      // only typed text is read: the field shows +10 for a positive value, and reading that back would add 10 again
-      const commit = () => {
-        if (num.value === fmt(get())) return;
-        const v = parseEntry(num.value, get());
-        if (v != null && isFinite(v)) setV(v, true);
-        num.value = fmt(get());
-      };
-      on(num, 'keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); commit(); num.select(); }
-        else if (e.key === 'Escape') { num.value = fmt(get()); num.blur(); }
-        else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          setV(get() + (e.key === 'ArrowUp' ? 1 : -1) * step * (e.shiftKey ? 10 : 1));
-          num.value = fmt(get()); num.select();
-        }
-        e.stopPropagation();
-      });
-      on(num, 'blur', commit);
-      on(num, 'dblclick', e => e.stopPropagation());
-      const ctl = { update, row };
+      const ctl = { update, row: w };
       controls.push(ctl);
       update();
       return ctl;
     }
 
-    function sub(parent, text) { parent.appendChild(el('div', 'hcg-sub', text)); }
+    function sub(parent, text) { parent.appendChild(el('div', 'hcg-sub', L(text))); }
 
     function segmented(parent, items, cur, onPick) {
       const seg = el('div', 'hcg-seg');
-      const btns = items.map(([id, label, sw]) => {
-        const b = el('button', id === cur ? 'on' : '', (sw ? `<span class="sw" style="background:${sw}"></span>` : '') + label);
+      // [id, label, swatch, dotOnly]: a dot alone says its channel by its colour, the words in its tooltip (as Lightroom's curve channels)
+      const btns = items.map(([id, label, sw, dot]) => {
+        const b = el('button', (id === cur ? 'on' : '') + (dot ? ' dot' : ''), (sw ? `<span class="sw" style="background:${sw}"></span>` : '') + (dot ? '' : Ls(label)));
+        b.dataset.k = label; b.title = L(label); b.setAttribute('aria-label', L(label));
         on(b, 'click', () => { btns.forEach(x => x.classList.toggle('on', x === b)); onPick(id); });
         seg.appendChild(b);
         return b;
@@ -1131,7 +1386,7 @@ void main(){
 
     /* ===== Basic ===== */
     {
-      const pad = section('basic', 'Basic', ['temp', 'tint', 'exposure', 'contrast', 'highlights', 'shadows', 'whites', 'blacks', 'texture', 'clarity', 'dehaze', 'vibrance', 'saturation'], true);
+      const pad = section('basic', 'Basic', SECTION_PATHS.basic, true);
       sub(pad, 'White Balance');
       slider(pad, { path: 'temp', label: 'Temp', min: -100, max: 100, track: TRACK.temp });
       slider(pad, { path: 'tint', label: 'Tint', min: -100, max: 100, track: TRACK.tint });
@@ -1153,16 +1408,16 @@ void main(){
     /* ===== Curve ===== */
     let histo = null, setHistoHook = () => {};
     {
-      const pad = section('curve', 'Curve', ['curve'], false);
+      const pad = section('curve', 'Curve', SECTION_PATHS.curve, false);
       let mode = 'rgb';
-      segmented(pad, [['param', 'Parametric'], ['rgb', 'RGB', '#e4e4e7'], ['red', 'Red', '#ef4444'], ['green', 'Green', '#22c55e'], ['blue', 'Blue', '#3b82f6']],
+      segmented(pad, [['param', 'Parametric'], ['rgb', 'RGB', '#e4e4e7'], ['red', 'Red', '#ef4444', 1], ['green', 'Green', '#22c55e', 1], ['blue', 'Blue', '#3b82f6', 1]],
         mode, m => { mode = m; layout(); draw(); });
       const wrap = el('div', 'hcg-cv');
       const cv = el('canvas');
       const readout = el('div', 'hcg-readout');
       wrap.append(cv, readout);
       pad.appendChild(wrap);
-      const hint = el('div', 'hcg-hint', 'Click to add a point, drag it off the grid to remove');
+      const hint = el('div', 'hcg-hint', L('Click to add a point, drag it off the grid to remove'));
       pad.appendChild(hint);
       const pbox = el('div');
       pad.appendChild(pbox);
@@ -1199,7 +1454,7 @@ void main(){
       const sEnd = () => { if (sdrag >= 0) knobs[sdrag].classList.remove('drag'); sdrag = -1; };
       on(splitEl, 'pointerup', sEnd); on(splitEl, 'pointercancel', sEnd);
       on(splitEl, 'dblclick', () => { state.curve.splits = [25, 50, 75]; layoutSplits(); draw(); emit(); });
-      splitEl.title = 'Region splits (double-click to reset)';
+      splitEl.title = L('Region splits (double-click to reset)');
 
       function layout() {
         const isP = mode === 'param';
@@ -1231,17 +1486,18 @@ void main(){
         if (!size()) return;
         const ctx = cv.getContext('2d');
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const cs = getComputedStyle(root);
+        const cs = getComputedStyle(root), ink = cs.getPropertyValue('--ink').trim() || '#f4f4f5';
+        COL.rgb = COL.param = ink;   // the neutral curve in the ink of the page's theme (white on the dark panel, near black on the light one)
         ctx.fillStyle = cs.getPropertyValue('--panel'); ctx.fillRect(0, 0, W, W);
         // histogram
         if (histo) {
           const chans = mode === 'red' ? [['r', 'rgba(248,113,113,.35)']] : mode === 'green' ? [['g', 'rgba(74,222,128,.32)']] : mode === 'blue' ? [['b', 'rgba(96,165,250,.38)']] :
-            [['l', 'rgba(255,255,255,.13)']];
+            [['l', ink]];
           chans.forEach(([k, col]) => {
             const a = histo[k];
             ctx.beginPath(); ctx.moveTo(0, W);
             for (let i = 0; i < 256; i++) ctx.lineTo(i / 255 * W, W - a[i] * W * 0.62);
-            ctx.lineTo(W, W); ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+            ctx.lineTo(W, W); ctx.closePath(); ctx.fillStyle = col; if (k === 'l') ctx.globalAlpha = .13; ctx.fill(); ctx.globalAlpha = 1;
           });
         }
         // grid
@@ -1250,13 +1506,13 @@ void main(){
         for (let i = 1; i < 4; i++) { const g = Math.round(i * W / 4) + 0.5; ctx.moveTo(g, 0); ctx.lineTo(g, W); ctx.moveTo(0, g); ctx.lineTo(W, g); }
         ctx.stroke();
         if (mode === 'param') {
-          ctx.fillStyle = 'rgba(255,255,255,.035)';
+          ctx.fillStyle = ink; ctx.globalAlpha = .035;
           const s = state.curve.splits;
-          [[0, s[0]], [s[1], s[2]]].forEach(([a, b]) => ctx.fillRect(a / 100 * W, 0, (b - a) / 100 * W, W));
+          [[0, s[0]], [s[1], s[2]]].forEach(([a, b]) => ctx.fillRect(a / 100 * W, 0, (b - a) / 100 * W, W)); ctx.globalAlpha = 1;
         }
         // diagonal
-        ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.setLineDash([3, 4]);
-        ctx.beginPath(); ctx.moveTo(0, W); ctx.lineTo(W, 0); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = ink; ctx.globalAlpha = .14; ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.moveTo(0, W); ctx.lineTo(W, 0); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
         // other channels' curves faintly when on RGB
         if (mode === 'rgb') {
           ['red', 'green', 'blue'].forEach(ch => {
@@ -1292,7 +1548,7 @@ void main(){
       function local(e) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top, r]; }
       function showReadout(p) {
         if (!p) { wrap.classList.remove('show'); return; }
-        readout.textContent = removing ? 'Release to remove point' : `Input ${Math.round(p[0])}  ·  Output ${Math.round(p[1])}`;
+        readout.textContent = removing ? L('Release to remove point') : `${L('Input')} ${Math.round(p[0])}  ·  ${L('Output')} ${Math.round(p[1])}`;
         wrap.classList.add('show');
       }
       on(cv, 'pointerdown', e => {
@@ -1354,7 +1610,7 @@ void main(){
 
     /* ===== Detail ===== */
     {
-      const pad = section('detail', 'Detail', ['sharpening', 'sharpenRadius', 'noiseReduction'], false);
+      const pad = section('detail', 'Detail', SECTION_PATHS.detail, false);
       slider(pad, { path: 'sharpening', label: 'Sharpening', min: 0, max: 150 });
       slider(pad, { path: 'sharpenRadius', label: 'Radius', min: 0.5, max: 3, step: 0.1, dec: 1 });
       slider(pad, { path: 'noiseReduction', label: 'Noise Reduction', min: 0, max: 100 });
@@ -1362,7 +1618,7 @@ void main(){
 
     /* ===== Color Mixer ===== */
     {
-      const pad = section('mixer', 'Color Mixer', ['hsl'], false);
+      const pad = section('mixer', 'Color Mixer', SECTION_PATHS.mixer, false);
       let mode = 'hue';
       segmented(pad, [['hue', 'Hue'], ['sat', 'Saturation'], ['lum', 'Luminance'], ['all', 'All']], mode, m => { mode = m; build(); });
       const box = el('div');
@@ -1383,9 +1639,223 @@ void main(){
       build();
     }
 
+    /* ===== Hue/Saturation (Photoshop's, owner 2026-10-06) ===== */
+    {
+      const pad = section('hs', 'Hue/Saturation', SECTION_PATHS.hs, false);
+      const RCOL = { reds: 'hsl(0 85% 55%)', yellows: 'hsl(55 90% 52%)', greens: 'hsl(120 70% 45%)', cyans: 'hsl(185 80% 48%)', blues: 'hsl(230 85% 60%)', magentas: 'hsl(300 75% 56%)' };
+      const RNAME = { master: 'Master', reds: 'Reds', yellows: 'Yellows', greens: 'Greens', cyans: 'Cyans', blues: 'Blues', magentas: 'Magentas' };
+      let cur = 'master';   // the range being edited: Photoshop's «Edit» list as swatches
+      const H = () => state.hs, R = k => H()[k];
+      const centreOf = k => { const r = hsRange(R(k).r); return (r[1] + r[2]) / 2; };
+      const wrap = v => ((Math.round(v) % 360) + 360) % 360;
+
+      // Preset: Photoshop's list of Hue/Saturation presets, only the hs part of the grade changes
+      const prow = el('div', 'hcg-hsp');
+      const pbtn = el('button', 'hcg-sel', '<span></span>' + CHEV);
+      prow.append(el('span', 'l', L('Preset')), pbtn);
+      pad.appendChild(prow);
+      const pmenu = el('div', 'hcg-hsm');
+      root.appendChild(pmenu);
+      const hsOf = name => { const d = hsDefaults(); const n = normalize({ hs: mergeInto(d, hsPresets[name]) }).hs; return n; };
+      const presetName = () => { const c = JSON.stringify(H()); return Object.keys(hsPresets).find(n => JSON.stringify(hsOf(n)) === c) || null; };
+      const nameP = () => { pbtn.querySelector('span').textContent = L(presetName() || 'Custom'); };
+      Object.keys(hsPresets).forEach(name => {
+        const b = el('button', '', svg('check', 'ck', 2.2) + `<span>${L(name)}</span>`); b.dataset.name = name;
+        on(b, 'click', () => { state.hs = hsOf(name); closeP(); syncHs(true); emit(); });
+        pmenu.appendChild(b);
+      });
+      const closeP = () => { pmenu.classList.remove('open'); pbtn.classList.remove('on'); };
+      on(pbtn, 'click', e => {
+        e.stopPropagation();
+        const open = !pmenu.classList.contains('open');
+        if (open) {
+          const rr = root.getBoundingClientRect(), br = pbtn.getBoundingClientRect(), cn = presetName();
+          pmenu.style.left = (br.left - rr.left) + 'px'; pmenu.style.top = (br.bottom - rr.top + 4) + 'px'; pmenu.style.minWidth = br.width + 'px';
+          pmenu.querySelectorAll('button').forEach(b => b.classList.toggle('cur', b.dataset.name === cn));
+        }
+        pmenu.classList.toggle('open', open); pbtn.classList.toggle('on', open);
+      });
+      on(document, 'pointerdown', e => { if (!pmenu.contains(e.target) && !pbtn.contains(e.target)) closeP(); });
+
+      // the range row: Master (the colour wheel) and the six ranges, the three eyedroppers at its right
+      const rrow = el('div', 'hcg-hsr');
+      const sws = {};
+      ['master', ...HS_RANGES].forEach(k => {
+        const b = el('button', 'hcg-sw' + (k === 'master' ? ' master' : ''));
+        if (k !== 'master') b.style.background = RCOL[k];
+        b.title = L(RNAME[k]); b.setAttribute('aria-label', L(RNAME[k]));
+        on(b, 'click', () => { cur = k; syncHs(); });
+        rrow.appendChild(b); sws[k] = b;
+      });
+      rrow.appendChild(el('span', 'sp'));
+      const picks = {};
+      [['set', 'eyedropper', 'Select a colour range on the image'], ['add', 'eyedropperAdd', 'Add to the colour range'], ['sub', 'eyedropperSub', 'Subtract from the colour range']].forEach(([m, ic, tip]) => {
+        const b = el('button', 'hcg-ib', svg(ic, 'ic', 1.8)); b.title = L(tip); b.setAttribute('aria-label', L(tip)); b.dataset.pick = m;
+        on(b, 'click', () => startPick(m));
+        rrow.appendChild(b); picks[m] = b;
+        if (!opts.pick) b.style.display = 'none';   // a host that cannot sample its picture has no eyedroppers
+      });
+      pad.appendChild(rrow);
+      const rname = el('div', 'hcg-hsn');
+      pad.appendChild(rname);
+
+      // the sliders: the app's one slider; their range and colour track follow the edited range and Colorize
+      const hsCtl = [];
+      function hsSlider(o) {
+        const row = el('div', 'hcg-row'), w = el('div', 'hy-slider grad'), inp = el('input'); inp.type = 'range'; inp.step = 1;
+        const num = el('output', 'hy-slider-v'), lab = el('span', 'hy-slider-l', o.label);
+        num.title = L('Type a value: 10 sets it; +10 adds, -10 takes away, +10% adds a tenth, *2, /2; 1239+10 works too; an exact negative: 0-10');
+        inp.setAttribute('aria-label', o.label); w.dataset.hs = o.key;
+        w.append(inp, lab, num); row.appendChild(w); pad.appendChild(row);
+        const sl = global.hySlider.mount(w);
+        sl.format = v => { const c = w.dataset.center != null; return c && v > 0 ? '+' + Math.round(v) : String(Math.round(v)); };
+        sl.parse = (text, c) => { const v = parseEntry(text, c); return v == null ? NaN : v; };
+        function update() {
+          const [mn, mx, def, signed] = o.range();
+          inp.min = mn; inp.max = mx; if (signed) w.dataset.center = '0'; else delete w.dataset.center;
+          w.dataset.reset = String(def); w.style.setProperty('--hy-sl-grad', o.track());
+          inp.value = String(o.get()); sl.paint();
+        }
+        on(inp, 'input', () => { const [mn, mx] = o.range(), v = Math.min(mx, Math.max(mn, Math.round(+inp.value))); if (v === o.get()) return; o.set(v); emit(); drawBA(); markSw(); nameP(); });
+        const ctl = { update, row: w }; hsCtl.push(ctl); return ctl;
+      }
+      const isCol = () => !!H().colorize;
+      const hueAt = deg => `hsl(${deg} 85% 52%)`;
+      const spectrum = (from, to) => `linear-gradient(90deg,${[0, 1, 2, 3, 4, 5, 6].map(i => hueAt(from + (to - from) * i / 6)).join(',')})`;
+      const cHue = () => (cur === 'master' ? 0 : centreOf(cur));
+      hsSlider({ key: 'hue', label: L('Hue'), get: () => isCol() ? H().ch : R(cur).hue, set: v => { if (isCol()) H().ch = v; else R(cur).hue = v; },
+        range: () => isCol() ? [0, 360, 0, false] : [-180, 180, 0, true], track: () => isCol() ? spectrum(0, 360) : spectrum(cHue() - 180, cHue() + 180) });
+      hsSlider({ key: 'sat', label: L('Saturation'), get: () => isCol() ? H().cs : R(cur).sat, set: v => { if (isCol()) H().cs = v; else R(cur).sat = v; },
+        range: () => isCol() ? [0, 100, 25, false] : [-100, 100, 0, true],
+        track: () => isCol() ? `linear-gradient(90deg,hsl(${H().ch} 0% 50%),hsl(${H().ch} 90% 50%))` : cur === 'master' ? TRACK.sat : `linear-gradient(90deg,hsl(${cHue()} 0% 50%),hsl(${cHue()} 90% 52%))` });
+      hsSlider({ key: 'light', label: L('Lightness'), get: () => isCol() ? H().cl : R(cur).light, set: v => { if (isCol()) H().cl = v; else R(cur).light = v; },
+        range: () => [-100, 100, 0, true], track: () => `linear-gradient(90deg,#000,${isCol() ? `hsl(${H().ch} ${H().cs}% 50%)` : cur === 'master' ? '#808080' : `hsl(${cHue()} 85% 50%)`},#fff)` });
+
+      // Colorize: one hue for the whole picture (Photoshop starts it at Saturation 25)
+      const ck = el('button', 'hcg-ck', `<i>${svg('check', 'ic', 2.4)}</i><span>${L('Colorize')}</span>`);
+      on(ck, 'click', () => { H().colorize = H().colorize ? 0 : 1; if (H().colorize) cur = 'master'; syncHs(true); emit(); });
+      pad.appendChild(ck);
+
+      // Before-After: the spectrum as it is and as it comes out, the edited range's marks between them (inner range and falloff,
+      // dragged as in Photoshop: the inner bar's ends, the outer marks, the middle moves it all; a double click puts the range back)
+      const ba = el('div', 'hcg-ba'), bcv = el('canvas'), rd = el('div', 'rd', '<span></span><span></span>');
+      ba.append(bcv, rd); pad.appendChild(ba);
+      ba.title = L('Drag the marks: between the inner ones the full effect, out to the outer ones it fades; double-click puts the range back');
+      let BW = 0, bdpr = 1, drag = null;
+      const lo = () => drag ? drag.lo : cur === 'master' ? 0 : centreOf(cur) - 180;
+      const xOf = deg => (deg - lo()) / 360 * BW;
+      function drawBA() {
+        const w = Math.round(ba.clientWidth || 0); if (!w) return;
+        bdpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+        if (BW !== w || bcv.width !== Math.round(w * bdpr)) { BW = w; bcv.width = Math.round(w * bdpr); bcv.height = Math.round(46 * bdpr); }
+        const ctx = bcv.getContext('2d'); ctx.setTransform(bdpr, 0, 0, bdpr, 0, 0); ctx.clearRect(0, 0, BW, 46);
+        const cs = getComputedStyle(root), ink = cs.getPropertyValue('--ink').trim() || '#fafafa', l0 = lo(), hs = normalize({ hs: H() }).hs;
+        for (let x = 0; x < BW; x++) {
+          const deg = l0 + (x + 0.5) / BW * 360, c = hsl2rgb(deg, 1, 0.5), o = hsApply(c, hs);
+          ctx.fillStyle = `rgb(${c.map(v => Math.round(v * 255)).join(',')})`; ctx.fillRect(x, 0, 1, 10);
+          ctx.fillStyle = `rgb(${o.map(v => Math.round(v * 255)).join(',')})`; ctx.fillRect(x, 36, 1, 10);
+        }
+        const [s0, s1] = rd.children;
+        if (cur === 'master' || isCol()) { s0.textContent = ''; s1.textContent = ''; return; }
+        const r = hsRange(R(cur).r), [xa, xb, xc, xd] = r.map(xOf);
+        ctx.globalAlpha = .22; ctx.fillStyle = ink; ctx.fillRect(xa, 18, xb - xa, 10); ctx.fillRect(xc, 18, xd - xc, 10);
+        ctx.globalAlpha = .55; ctx.fillRect(xb, 18, xc - xb, 10); ctx.globalAlpha = 1;
+        ctx.fillStyle = ink;
+        [xb, xc].forEach(x => ctx.fillRect(Math.round(x) - 1.5, 14, 3, 18));
+        [xa, xd].forEach(x => { ctx.beginPath(); ctx.moveTo(x, 28); ctx.lineTo(x - 4.5, 33); ctx.lineTo(x + 4.5, 33); ctx.closePath(); ctx.fill(); });
+        s0.textContent = `${wrap(r[0])}°/${wrap(r[1])}°`; s1.textContent = `${wrap(r[2])}° \\ ${wrap(r[3])}°`;
+      }
+      redraws.push(drawBA);
+      function hitBA(x) {
+        if (cur === 'master' || isCol()) return null;
+        const r = hsRange(R(cur).r), xs = r.map(xOf);
+        let best = null, bd = 8;
+        [1, 2, 0, 3].forEach(i => { const d = Math.abs(xs[i] - x); if (d < bd) { bd = d; best = i; } });
+        if (best != null) return best;
+        return x > xs[0] && x < xs[3] ? 'all' : null;
+      }
+      on(bcv, 'pointermove', e => { if (drag) return; const h = hitBA(e.clientX - bcv.getBoundingClientRect().left); bcv.style.cursor = h == null ? 'default' : h === 'all' ? 'grab' : 'ew-resize'; });
+      on(bcv, 'pointerdown', e => {
+        if (e.button !== 0) return;
+        const x = e.clientX - bcv.getBoundingClientRect().left, h = hitBA(x); if (h == null) return;
+        e.preventDefault(); bcv.setPointerCapture(e.pointerId);
+        drag = { h, x, r0: hsRange(R(cur).r), lo: lo() };
+        if (h === 'all') bcv.style.cursor = 'grabbing';
+      });
+      on(bcv, 'pointermove', e => {
+        if (!drag) return;
+        const d = Math.round((e.clientX - bcv.getBoundingClientRect().left - drag.x) / (BW || 1) * 360), r = drag.r0.slice();
+        if (drag.h === 'all') for (let i = 0; i < 4; i++) r[i] += d;
+        else {
+          const i = drag.h; r[i] += d;
+          if (i === 0) r[0] = Math.min(r[1], Math.max(r[3] - 359, r[0]));
+          if (i === 3) r[3] = Math.max(r[2], Math.min(r[0] + 359, r[3]));
+          if (i === 1) { r[1] = Math.min(r[2], Math.max(r[0], r[1])); }
+          if (i === 2) { r[2] = Math.max(r[1], Math.min(r[3], r[2])); }
+        }
+        if (JSON.stringify(r) !== JSON.stringify(R(cur).r)) { R(cur).r = r; drawBA(); emit(); hsCtl.forEach(c => c.update()); markSw(); nameP(); }
+      });
+      const endBA = () => { if (!drag) return; drag = null; normRange(cur); bcv.style.cursor = ''; drawBA(); };
+      on(bcv, 'pointerup', endBA); on(bcv, 'pointercancel', endBA);
+      on(bcv, 'dblclick', () => { if (cur === 'master' || isCol()) return; R(cur).r = DEF.hs[cur].r.slice(); syncHs(); emit(); });
+      // a range moved a whole turn round is the same range: its centre is kept within the circle
+      function normRange(k) { const r = hsRange(R(k).r), m = (r[1] + r[2]) / 2, t = Math.floor(m / 360) * 360; if (t) R(k).r = r.map(v => v - t); else R(k).r = r; }
+
+      // the eyedroppers: a click on the picture (the host samples it: opts.pick) picks the range (Master picks the nearest one, as in
+      // Photoshop), + widens the inner range to the colour, − narrows it to leave the colour out
+      let picking = null;
+      function startPick(mode) {
+        if (picking) { const was = picking.mode; stopPick(); if (was === mode) return; }
+        if (!opts.pick) return;
+        picks[mode].classList.add('on');
+        picking = { mode, cancel: null };
+        const cancel = opts.pick(rgb => { const m = picking && picking.mode; stopPick(true); if (rgb && m) applyPick(rgb, m); });
+        if (picking) picking.cancel = cancel;
+      }
+      function stopPick(quiet) {
+        if (!picking) return; const p = picking; picking = null;
+        Object.values(picks).forEach(b => b.classList.remove('on'));
+        if (!quiet && typeof p.cancel === 'function') p.cancel();
+      }
+      on(window, 'keydown', e => { if (picking && e.key === 'Escape') stopPick(); });
+      function applyPick(rgb, mode) {
+        if (isCol()) return;
+        const [h, s] = rgb2hsl(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255); if (!(s > 0)) return;   // a grey has no hue: no range to take
+        const dist = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
+        if (cur === 'master') cur = HS_RANGES.reduce((best, k) => dist(h, centreOf(k)) < dist(h, centreOf(best)) ? k : best, HS_RANGES[0]);
+        const r = hsRange(R(cur).r), m = (r[1] + r[2]) / 2, hh = Math.round(m + ((h - m) % 360 + 540) % 360 - 180);
+        if (mode === 'set') { const d = hh - Math.round(m); for (let i = 0; i < 4; i++) r[i] += d; }
+        else if (mode === 'add') {
+          if (hh < r[1]) { const f = r[1] - r[0]; r[1] = hh; r[0] = Math.max(r[3] - 359, hh - f); }
+          else if (hh > r[2]) { const f = r[3] - r[2]; r[2] = hh; r[3] = Math.min(r[0] + 359, hh + f); }
+        } else if (mode === 'sub') {
+          if (hh >= r[1] && hh <= r[2]) { if (hh - r[1] <= r[2] - hh) { const f = r[1] - r[0]; r[1] = Math.min(r[2], hh + 1); r[0] = r[1] - f; } else { const f = r[3] - r[2]; r[2] = Math.max(r[1], hh - 1); r[3] = r[2] + f; } }
+          else if (hh >= r[0] && hh < r[1]) r[0] = Math.min(r[1], hh + 1);
+          else if (hh > r[2] && hh <= r[3]) r[3] = Math.max(r[2], hh - 1);
+        }
+        R(cur).r = r; normRange(cur); syncHs(); emit();
+      }
+
+      function markSw() { HS_RANGES.forEach(k => sws[k].classList.toggle('mod', !!(R(k).hue || R(k).sat || R(k).light) || JSON.stringify(R(k).r) !== JSON.stringify(DEF.hs[k].r))); }
+      function syncHs(animate) {
+        if (isCol()) cur = 'master';
+        Object.entries(sws).forEach(([k, b]) => b.classList.toggle('on', k === cur));
+        rrow.classList.toggle('dis', isCol());
+        ck.classList.toggle('on', isCol());
+        nameP();
+        rname.textContent = isCol() ? L('Colorize') : L(RNAME[cur]);
+        hsCtl.forEach(c => { if (animate) { c.row.classList.add('jump'); setTimeout(() => c.row.classList.remove('jump'), 260); } c.update(); });
+        markSw(); drawBA();
+      }
+      controls.push({ update: () => syncHs() });
+      syncHs();
+      panelApi.hs = { pick: (rgb, mode) => applyPick(rgb, mode || 'set'), select: k => { cur = k in sws ? k : 'master'; syncHs(); }, get range() { return cur; }, stopPick };
+    }
+    panelApi.sc = SC.section({ section, segmented, el, on, L, emit, controls, parseEntry, state: () => state });   // Selective Color (selcolor.js)
+
     /* ===== Color Grading ===== */
     {
-      const pad = section('grading', 'Color Grading', ['grading'], false);
+      const pad = section('grading', 'Color Grading', SECTION_PATHS.grading, false);
       let mode = '3way';
       segmented(pad, [['3way', '3-Way'], ['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights'], ['global', 'Global']], mode, m => { mode = m; build(); });
       const box = el('div');
@@ -1420,7 +1890,7 @@ void main(){
       function wheel(parent, zone, S, full) {
         const w = el('div', 'hcg-wheel' + (full ? ' full' : ''));
         if (!full) w.style.width = S + 'px';
-        const lab = el('div', 'wl', `<b>${ZN[zone]}</b><span class="wv"></span>`);
+        const lab = el('div', 'wl', `<b>${L(ZN[zone])}</b><span class="wv"></span>`);
         const cv = el('canvas');
         cv.style.width = cv.style.height = S + 'px';
         w.append(lab, cv);
@@ -1469,7 +1939,7 @@ void main(){
         const end = () => { dragging = false; };
         on(cv, 'pointerup', end); on(cv, 'pointercancel', end);
         on(cv, 'dblclick', () => { const z = getPath(state, path); z.hue = 0; z.sat = 0; draw(); emit(); syncSliders(); });
-        cv.title = 'Drag to set hue and saturation (Shift keeps hue, double-click resets)';
+        cv.title = L('Drag to set hue and saturation (Shift keeps hue, double-click resets)');
         const ctl = { update: draw };
         controls.push(ctl); built.push(ctl);
         draw();
@@ -1519,7 +1989,7 @@ void main(){
 
     /* ===== Effects ===== */
     {
-      const pad = section('effects', 'Effects', ['vignette', 'grain'], false);
+      const pad = section('effects', 'Effects', SECTION_PATHS.effects, false);
       sub(pad, 'Vignette');
       slider(pad, { path: 'vignette.amount', label: 'Amount', min: -100, max: 100, track: TRACK.vig });
       slider(pad, { path: 'vignette.midpoint', label: 'Midpoint', min: 0, max: 100 });
@@ -1532,7 +2002,7 @@ void main(){
     }
 
     function refreshAll(animate) {
-      if (animate) controls.forEach(c => { if (c.row) { c.row.classList.add('anim'); setTimeout(() => c.row.classList.remove('anim'), 260); } });
+      if (animate) controls.forEach(c => { if (c.row) { c.row.classList.add('jump'); setTimeout(() => c.row.classList.remove('jump'), 260); } });   // the slider's own glide (ui/slider.css .jump)
       controls.forEach(c => c.update());
       refreshSections();
     }
@@ -1546,20 +2016,26 @@ void main(){
     }
     refreshSections();
 
-    return {
+    // live answers (Object.assign below would copy a getter's value once)
+    Object.defineProperties(panelApi, {
+      before: { get: () => !!state.bypass, configurable: true },
+      menuOpen: { get: () => menu.classList.contains('open'), configurable: true }
+    });
+    return Object.assign(panelApi, {
       el: root,
       set(p) { setState(p, false); },
       get() { return clone(state); },
       setHistogram(h) { setHistoHook(h); },
       setBefore,
-      get before() { return before; },
+      closeMenu,
       destroy() {
         listeners.forEach(f => f());
         if (pending) cancelAnimationFrame(pending);
         if (ro) ro.disconnect();
+        if (panelApi.hs) panelApi.hs.stopPick();
         root.remove();
       }
-    };
+    });
   }
   global.HyColorGrade = {
     version: '1.0.0',
@@ -1568,9 +2044,18 @@ void main(){
     defaults,
     normalize,
     isNeutral,
+    effective,
+    SECTION_PATHS,
     presets,
+    presetOf,
+    presetHover,
+    sample,
+    swatch,
     histogram,
     HUES,
-    _internal: { monotoneSpline, buildCurveLUT, buildHslLUT, parseEntry, wbGains }
+    HS_RANGES,
+    hsPresets,
+    hsApply,
+    _internal: { monotoneSpline, buildCurveLUT, buildHslLUT, parseEntry, wbGains, hsWeight, psSat, hsRange, rgb2hsl, hsl2rgb }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

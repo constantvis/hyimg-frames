@@ -40,7 +40,11 @@ ITEMS = {"a1": {"path": "pics/a.png", "x": 0, "y": 0, "w": 600, "ar": 1.5, "crop
 
 
 @pytest.fixture
-def hy(tmp_path):
+def hy(tmp_path, request):
+    # the interface's language (owner 2026-10-06: «make 2 versions, Russian and English»): the app's setting cv.lang in its settings
+    # file; these tests read the Russian words, an English test asks for "en" (indirect parametrize), which is the app's default
+    lang = getattr(request, "param", "ru")
+    (tmp_path / "settings.json").write_text(json.dumps({"cv.lang": "ru"} if lang == "ru" else {}))
     lib, state, plugins = tmp_path / "lib", tmp_path / "state", tmp_path / "plugins"
     (lib / "pics").mkdir(parents=True); (state / "boards").mkdir(parents=True); plugins.mkdir(); (plugins / "frames").symlink_to(HERE)
     picture(600, 400, (200, 40, 40), (240, 180, 60)).save(lib / "pics/a.png")
@@ -57,8 +61,10 @@ def hy(tmp_path):
     for _ in range(100):
         try: urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1); break
         except OSError: time.sleep(0.1)
-    yield port, lib, state
-    proc.terminate(); proc.wait(5); log.close()
+    try:   # the server goes even when the test fails or is interrupted
+        yield port, lib, state
+    finally:
+        proc.terminate(); proc.wait(5); log.close()
 
 
 def post(port, path, body, ctype="application/octet-stream"):
@@ -149,11 +155,12 @@ def test_frame_make_edit_save_undo_explode(hy, engine):
         cam0 = page.evaluate("() => JSON.stringify(cam)")
         page.dblclick(f".plg[data-id='{fid}']")
         fr = editor(page)
-        assert fr.evaluate("() => __ed.root.length") == 2 and fr.evaluate("() => [__ed.W, __ed.H]") == [1000, 450]
-        assert fr.evaluate("() => __ed.root.every(n => n.orig && n.locks.pixels)")   # originals are locked bases
+        assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).length") == 2 and fr.evaluate("() => [__ed.W, __ed.H]") == [1000, 450]
+        assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).every(n => n.orig && n.locks.pixels)")   # originals are locked bases
         assert page.evaluate("() => JSON.stringify(cam)") == cam0
         assert page.evaluate("() => document.documentElement.classList.contains('ifedit') && document.querySelector('#cIfr').textContent.includes('Фрейм 1') && !!document.querySelector('#dock.plg-mode #ifActs')")
-        assert page.evaluate("() => getComputedStyle(document.documentElement).getPropertyValue('--toast-top').trim()") == "60px"
+        # the notes stand under the app's top row in every mode (Hyimg ui/toasts.js, --hy-row-under): the editor moves nothing
+        assert page.evaluate("() => getComputedStyle(document.documentElement).getPropertyValue('--toast-top').trim()") == ""
         # the frame is drawn exactly where its card lies: the editor's view is the board's camera
         v = fr.evaluate("() => ({ x: __ed.V.x, y: __ed.V.y, s: __ed.V.s })")
         r = page.evaluate(f"() => {{ const e = document.querySelector(\".plg[data-id='{fid}']\").getBoundingClientRect(); return [e.left, e.top, e.width]; }}")
@@ -172,7 +179,7 @@ def test_frame_make_edit_save_undo_explode(hy, engine):
         page.mouse.move(*to(100, 225)); page.mouse.down()
         for k in range(1, 21): page.mouse.move(*to(100 + k * 20, 225 + (k % 2) * 4))
         page.mouse.up(); time.sleep(0.3)
-        assert fr.evaluate("() => __ed.root.length") == 3
+        assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).length") == 3
         fr.click("#bSave")
         page.wait_for_function(f"() => board.items['{fid}'].v === 2", timeout=60000)
         closed(page)
@@ -206,7 +213,7 @@ def test_frame_make_edit_save_undo_explode(hy, engine):
         # and no changes closes the editor
         page.dblclick(f".plg[data-id='{fid}']")
         fr = editor(page)
-        assert fr.evaluate("() => __ed.root.length") == 3   # the painted layer came back from its file
+        assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).length") == 3   # the painted layer came back from its file
         fr.evaluate("() => __ed.canvasSize(1000, 900, 0, 0)")
         fr.click("#bSave")
         page.wait_for_function(f"() => board.items['{fid}'].v === 3", timeout=60000); closed(page)
@@ -263,7 +270,7 @@ def test_native_pixels_each_group_and_library_drop(hy):
         fr.evaluate("""() => { const dt = new DataTransfer(); dt.setData('text/x-frames', JSON.stringify(['pics/lib.png'])); dt.setData('text/x-frame', 'pics/lib.png');
           const x = __ed.V.x + 1200 * __ed.V.s, y = __ed.V.y + 800 * __ed.V.s;
           for (const t of ['dragenter', 'dragover', 'drop']) window.dispatchEvent(new DragEvent(t, { dataTransfer: dt, clientX: x, clientY: y, bubbles: true, cancelable: true })); }""")
-        fr.wait_for_function("() => __ed.root.length === 2", timeout=20000)
+        fr.wait_for_function("() => __ed.root.filter(n => !n.main && !n.mmask).length === 2", timeout=20000)
         top = fr.evaluate("() => { const n = __ed.root[1]; return { w: n.w, h: n.h, cx: n.x + n.w / 2, cy: n.y + n.h / 2, orig: !!n.orig, path: n.src && n.src.path, cw: n.c.width, px: 1 / __ed.V.s }; }")
         assert (top["w"], top["h"], top["orig"], top["path"], top["cw"]) == (500, 500, True, "pics/lib.png", 500), top   # its own pixels
         assert abs(top["cx"] - 1200) <= top["px"] + .01 and abs(top["cy"] - 800) <= top["px"] + .01, top   # at the drop point (a screen pixel is px document pixels)
@@ -294,7 +301,7 @@ def test_old_frame_opens_and_versions_are_pruned(hy):
         page.evaluate("fit()"); page.wait_for_timeout(1500)
         page.dblclick(".plg[data-id='f1']")
         fr = editor(page)
-        assert fr.evaluate("() => __ed.root.length") == 1 and fr.evaluate("() => __ed.VERSION") == 0
+        assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).length") == 1 and fr.evaluate("() => __ed.VERSION") == 0
         fr.evaluate("() => __ed.canvasSize(600, 500, 0, 0)")
         fr.click("#bSave")
         page.wait_for_function("() => board.items.f1.v === 1", timeout=60000); closed(page)
@@ -409,3 +416,112 @@ def test_lama_keeps_strong_colours():
     out = lama.fill(src, hole.astype(np.uint8) * 255)
     want, got = im[hole].astype(float).mean(0), out[hole].astype(float).mean(0)
     assert np.abs(want - got).max() < 8, (want, got)
+
+
+CYR = re.compile(r"[А-Яа-яЁё]")
+
+
+@pytest.mark.parametrize("hy", ["en"], indirect=True)
+def test_plugin_speaks_english_by_default(hy):
+    """The interface in English (owner 2026-10-06: «make 2 versions, Russian and English, switchable in settings», English the default):
+    without cv.lang in the app's settings everything this plugin puts on the board is English: the HTML frame's dock button, its live
+    bar and its info card; the image frame's right-click items, the bar over the selection, the card's badges and info, the undo notes,
+    the crumb and the editor's frame. Scoped to the plugin's own elements: the board's own words are another module's."""
+    from playwright.sync_api import sync_playwright
+    port, lib, state = hy
+    (lib / "html/demo").mkdir(parents=True); (lib / "html/demo/index.html").write_text("<!doctype html><title>x</title><p>hi</p>")
+    with sync_playwright() as p:
+        browser, page, errors = open_board(p, port)
+        assert page.evaluate("() => HY.lang") == "en"
+        page.evaluate("() => { window.__notes = []; const c = window.commit; window.commit = (b, n) => { if (n) __notes.push(n); return c(b, n); }; }")
+        # the HTML frame: the dock button, the info card, the live bar
+        tip = page.locator("#dock button[title^='HTML frame']").get_attribute("title")
+        assert tip.startswith("HTML frame:") and not CYR.search(tip), tip
+        page.evaluate("() => { const b = snap(); board.items.h1 = { type: 'htmlframe', src: 'html/demo/index.html', vw: 1440, x: 0, y: 1400, w: 720, h: 450 }; commit(b); sel = new Set(['h1']); render(); }")
+        page.wait_for_timeout(300)
+        info = page.locator("#info").inner_text()
+        assert "HTML frame" in info and "Double-click" in info and not CYR.search(page.locator("#iN").inner_text() + page.locator("#iM").inner_text() + page.locator("#iP").inner_text()), info
+        page.dblclick(".plg[data-id=h1]")
+        page.wait_for_selector(".hfbar")
+        bar = page.evaluate("() => { const b = document.querySelector('.hfbar'); return b.innerText + ' ' + [...b.querySelectorAll('[title],[aria-label]')].map(e => (e.title || '') + ' ' + (e.getAttribute('aria-label') || '')).join(' '); }")
+        assert "Phone" in bar and "Done" in bar and "Reload" in bar and not CYR.search(bar), bar
+        page.click(".hfbar [data-a=done]")
+        # the image frame: the right click and the bar over the selection
+        page.evaluate("sel = new Set(['a1', 'b1']); render(); fit()"); time.sleep(0.6)
+        page.click(".it[data-id=a1]", button="right")
+        items = page.evaluate("() => [...document.querySelectorAll('#ctx button')].map(b => b.innerText.trim())")
+        ours = [t for t in items if "rame" in t]
+        assert any(t.startswith("Make frame") for t in ours) and any(t.startswith("Frame each (2)") for t in ours), items
+        assert not any(CYR.search(t) for t in ours), ours
+        page.keyboard.press("Escape")
+        page.evaluate("sel = new Set(['a1', 'b1']); render()")
+        pb = page.evaluate("() => [...document.querySelectorAll('.tidy [data-plgbar]')].map(b => b.innerText + ' ' + b.title).join(' | ')")
+        assert "Make frame" in pb and "All 2 images in one frame" in pb and not CYR.search(pb), pb
+        # ⌥⌘G: the frame's name, its badges, its info card and the undo note
+        page.keyboard.press("Alt+Meta+KeyG")
+        page.wait_for_function("() => Object.values(board.items).some(it => it.type === 'imgframe')", timeout=20000)
+        fid, card = page.evaluate("() => Object.entries(board.items).find(([k, it]) => it.type === 'imgframe')")
+        assert card["name"] == "Frame 1", card
+        notes = page.evaluate("() => __notes")
+        assert "Frame: 2 images inside, double-click opens the editor" in notes and not any(CYR.search(n) for n in notes), notes
+        badges = page.evaluate(f"() => [...document.querySelectorAll(\".plg[data-id='{fid}'] [title]\")].map(e => e.title).join(' | ')")
+        assert "Frame · 1000×450 px" in badges and not CYR.search(badges), badges
+        page.evaluate(f"sel = new Set(['{fid}']); render()"); page.wait_for_timeout(300)
+        inf = page.locator("#iN").inner_text() + " " + page.locator("#iM").inner_text() + " " + page.locator("#iP").inner_text()
+        # the info text is one footnote line since the hint rule (2011daa): «Unframe» lives in the right click now, checked below
+        assert "2 images" in inf and "Double-click or Enter: the editor · the images inside never change" in inf and not CYR.search(inf), inf
+        assert "Open" in page.locator(".tidy").inner_text()
+        page.click(f".plg[data-id='{fid}']", button="right")
+        items = page.evaluate("() => [...document.querySelectorAll('#ctx button')].map(b => b.innerText.trim())")
+        assert any(t.startswith("Open frame editor") for t in items) and "Unframe" in items, items
+        page.keyboard.press("Escape")
+        # the editor in place: its frame's title and the crumb
+        page.wait_for_timeout(1200)
+        page.dblclick(f".plg[data-id='{fid}']")
+        editor(page)
+        assert page.evaluate("() => document.querySelector('.ifed iframe').title") == "Frame editor"
+        assert "Frame 1" in page.locator("#cIfr").inner_text()
+        assert not errors, errors
+        browser.close()
+
+
+@pytest.mark.parametrize("engine", ["chromium", "webkit"])
+def test_editor_library_inset_and_look(hy, engine):
+    """The library floats over the board, so it never moves the editor's rulers: they stay at the window's edges and only the tool
+    rail and the options bar step out from under it (owner 2026-10-06). The editor's plates follow the board's «Форма» and «Тени» live,
+    and the options bar is a plate sized to its tool, not the window's width."""
+    if engine == "webkit" and not WEBKIT: pytest.skip("no Playwright WebKit (python3 -m playwright install webkit)")
+    from playwright.sync_api import sync_playwright
+    port, lib, state = hy
+    with sync_playwright() as p:
+        browser = getattr(p, engine).launch(); page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errors = []; page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(f"http://127.0.0.1:{port}/canvas.html?embed=1")   # as in the app: the board fills the window, the library floats
+        page.wait_for_function("() => typeof PLGST !== 'undefined' && PLGST.some(p => p.name === 'frames' && p.ok)", timeout=20000)
+        page.wait_for_selector(".it[data-id=a1]")
+        page.evaluate("sel = new Set(['a1', 'b1']); render(); fit()"); page.wait_for_timeout(400)
+        page.keyboard.press("Alt+Meta+KeyG")
+        page.wait_for_function("() => Object.values(board.items).some(it => it.type === 'imgframe')", timeout=20000)
+        fid = page.evaluate("() => Object.keys(board.items).find(k => board.items[k].type === 'imgframe')")
+        page.wait_for_timeout(1200)
+        page.evaluate(f"() => __frames.openEditor('{fid}')")
+        fr = editor(page); page.wait_for_timeout(900)
+        box = "() => { const r = s => { const b = document.querySelector(s).getBoundingClientRect(); return [Math.round(b.left), Math.round(b.width)]; }; return { rail: r('#rail'), obar: r('#obar'), view: r('#view') }; }"
+        frame = "() => Math.round(document.querySelector('.ifed iframe').getBoundingClientRect().left)"
+        a = fr.evaluate(box)
+        assert page.evaluate(frame) == 0 and a["view"] == [0, 1440], a
+        assert a["obar"][1] < 900, a   # sized to the brush's options, not stretched to the right column
+        page.evaluate("() => postMessage({ type: 'inset', left: 372 }, location.origin)"); page.wait_for_timeout(700)
+        b = fr.evaluate(box)
+        assert page.evaluate(frame) == 0 and b["view"] == [0, 1440], b   # the canvas and its rulers stay put
+        assert b["rail"][0] == 372 + 12 and b["obar"][0] == 372 + 12, b
+        page.evaluate("() => postMessage({ type: 'inset', left: 0 }, location.origin)"); page.wait_for_timeout(700)
+        assert fr.evaluate(box)["rail"][0] == 12 + 18, fr.evaluate(box)
+        look = "() => { const c = s => getComputedStyle(document.querySelector(s)); return { root: [document.documentElement.dataset.shape, document.documentElement.dataset.shadow], obar: c('#obar').borderTopLeftRadius, rail: c('#rail').borderTopLeftRadius, side: c('#side').boxShadow, tab: c('.tab').borderTopLeftRadius }; }"
+        r0 = fr.evaluate(look)
+        assert r0["root"] == ["round", "1"] and r0["obar"] == "999px" and r0["side"] != "none", r0
+        page.evaluate("() => { setPref('shape', 'pro'); setPref('shadow', '0'); applyLook(); }"); page.wait_for_timeout(300)
+        r1 = fr.evaluate(look)
+        assert r1["root"] == ["pro", "0"] and r1["obar"] == "11px" and r1["rail"] == "11px" and r1["tab"] == "8px" and r1["side"] == "none", r1
+        assert not errors, errors
+        browser.close()

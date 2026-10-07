@@ -54,7 +54,7 @@ def inpaint(body, query=None):
         return _json(503, {"error": f"The LaMa model is missing: {lama.MODEL}", "fallback": "local"})
     try:
         d = json.loads(body); img = _img(d["image"], "RGBA"); mask = _img(d["mask"], "L").resize(img.size)
-    except (ValueError, KeyError, TypeError, OSError) as ex:
+    except (ValueError, KeyError, TypeError, AttributeError, OSError) as ex:   # AttributeError: an image that is not a string (unit test, 2026-10-06)
         return _json(400, {"error": f"bad request: {ex}"})
     t = time.time()
     out = lama.fill(np.asarray(img)[..., :3], np.asarray(mask))
@@ -67,7 +67,7 @@ def subject(body, query=None):
     from PIL import Image
     try:
         d = json.loads(body); data = base64.b64decode(d["image"].split(",", 1)[-1])
-    except (ValueError, KeyError, TypeError) as ex:
+    except (ValueError, KeyError, TypeError, AttributeError) as ex:
         return _json(400, {"error": f"bad request: {ex}"})
     try:
         sub = _mod("subject")
@@ -111,7 +111,10 @@ def _refs(doc):
             if l.get("file"): out.add(l["file"])
             if isinstance(l.get("mask"), dict) and l["mask"].get("file"): out.add(l["mask"]["file"])
             walk(l.get("children"))
-    walk(doc.get("layers")); return out
+    walk(doc.get("layers"))
+    m = doc.get("mask")   # the master mask of the whole frame (owner 2026-10-06): its file and its baked look
+    if isinstance(m, dict): out |= {m[k] for k in ("file", "show") if isinstance(m.get(k), str)}
+    return out
 
 
 def versions(body, query=None):
@@ -131,12 +134,13 @@ def prune(body, query=None):
     need = set()
     for n in kept:
         try: need |= _refs(json.load(open(os.path.join(full, vs[n]), encoding="utf-8")))
-        except (OSError, ValueError): pass
+        except (OSError, ValueError, AttributeError, TypeError): pass   # a json that is not a frame's object: as an unreadable one
         need.add(f"{rel}/render.png" if n == 0 else f"{rel}/render.{n}.png")
     removed = []
     def rm(name):
         p = os.path.join(full, name)
-        if f"{rel}/{name}" in need or not os.path.isfile(p): return
+        # the master mask's files stay (owner 2026-10-06): a card's mask, pasted onto pictures, points to them from anywhere on the boards
+        if f"{rel}/{name}" in need or not os.path.isfile(p) or name.startswith("masks/main_mask"): return
         os.remove(p); removed.append(name)
     for n in old:
         rm(vs[n]); rm("render.png" if n == 0 else f"render.{n}.png")

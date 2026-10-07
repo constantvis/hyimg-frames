@@ -9,12 +9,13 @@
 // The page lives in the library (html/ is not shown as library frames) and is served by path (/lib/...), so its css, scripts and
 // pictures load by relative links.
 import { register as registerImageFrame } from "./imgframe.js";   // the image frame with its editor (owner 2026-10-05), its own module
+import { translator, lang } from "./lang.js";   // English or Russian, as the board is set (owner 2026-10-06)
 
 const TYPE = "htmlframe";
-const ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 8.5h18"/><path d="m9.5 12.5-2 2 2 2M14.5 12.5l2 2-2 2"/></svg>`;
-const PRESETS = [["Телефон", 390, 844], ["Планшет", 834, 1194], ["Ноутбук", 1280, 800], ["Десктоп", 1440, 900]];
+const ICON = window.hyIcon ? window.hyIcon("htmlFrame", 18, 1.8) : "";   // an HTML frame (ui/icons.js)
+const PRESETS = [["Phone", 390, 844], ["Tablet", 834, 1194], ["Laptop", 1280, 800], ["Desktop", 1440, 900]];   // names through t()
 const enc = encodeURIComponent, libUrl = p => "/lib/" + p.split("/").map(enc).join("/");
-let HY;
+let HY, t = k => k;
 const L = { id: null, s: 1, frame: null, bar: null };   // the frame open live, its scale (board units per css px)
 
 const vhOf = it => Math.max(1, Math.round(it.vw * it.h / it.w));
@@ -24,7 +25,7 @@ async function makeStill(it) {
   const r = await fetch(`/api/htmlstill?p=${enc(it.src)}&w=${it.vw}&h=${vhOf(it)}`, { method: "POST" });
   if (!r.ok) throw new Error(await r.text()); return r.json();
 }
-const engineName = () => /HyimgCEF/.test(navigator.userAgent) ? "Chromium" : (() => { try { return window.top.webkit && window.top.webkit.messageHandlers ? "WebKit" : null; } catch { return null; } })() || (/Chrome\//.test(navigator.userAgent) ? "Chrome" : /Safari\//.test(navigator.userAgent) ? "Safari" : "браузер");
+const engineName = () => /HyimgCEF/.test(navigator.userAgent) ? "Chromium" : (() => { try { return window.top.webkit && window.top.webkit.messageHandlers ? "WebKit" : null; } catch { return null; } })() || (/Chrome\//.test(navigator.userAgent) ? "Chrome" : /Safari\//.test(navigator.userAgent) ? "Safari" : t("browser"));
 
 // the card at rest: the still of the page at its viewport; missing, it is made once and shown when ready
 function still(el, it, id, fresh) {
@@ -34,7 +35,7 @@ function still(el, it, id, fresh) {
     img.addEventListener("load", () => el.classList.add("lo"));
     img.addEventListener("error", () => {
       const cur = HY.board.items[id]; if (!cur) return; const p = stillOf(cur); if (asked.has(p)) return; asked.add(p);
-      el.classList.add("making"); makeStill(cur).then(r => { asked.delete(p); img.src = libUrl(r.path) + `?v=${r.mtime}`; }).catch(e => { el.title = "снимок не сделан: " + e.message; }).finally(() => el.classList.remove("making"));
+      el.classList.add("making"); makeStill(cur).then(r => { asked.delete(p); img.src = libUrl(r.path) + `?v=${r.mtime}`; }).catch(e => { el.title = t("Still not made: {e}", { e: e.message }); }).finally(() => el.classList.remove("making"));
     });
   }
   const p = stillOf(it);
@@ -67,8 +68,8 @@ function stop() {
   HY.dock(null); L.bar = null; L.id = null;
   if (it) {
     const vw = Math.round(it.w / L.s);
-    if (vw !== it.vw) { const before = HY.snap(); it.vw = vw; HY.commit(before, "HTML: ширина страницы"); }
-    if (card) { card.classList.add("making"); makeStill(it).then(() => still(card, it, id, true)).catch(e => HY.toast("Снимок страницы не сделан: " + e.message, "error")).finally(() => card.classList.remove("making")); }
+    if (vw !== it.vw) { const before = HY.snap(); it.vw = vw; HY.commit(before, t("HTML: page width")); }
+    if (card) { card.classList.add("making"); makeStill(it).then(() => still(card, it, id, true)).catch(e => HY.toast(t("Page still not made: {e}", { e: e.message }), "error")).finally(() => card.classList.remove("making")); }
   }
   HY.render();
 }
@@ -79,10 +80,10 @@ function preset(vw, vh) {
 }
 function dockBar() {
   const b = document.createElement("div"); b.className = "hfbar";
-  b.innerHTML = PRESETS.map(([n, w, h]) => `<button class="wide" data-pre="${w}x${h}" title="${n}: ${w}×${h}">${n}</button>`).join("")
-    + `<span class="sep"></span><label class="hfsz" title="Размер страницы в css-пикселях: впиши число или тяни край рамки"><input data-w inputmode="numeric" aria-label="Ширина страницы">×<input data-h inputmode="numeric" aria-label="Высота страницы"></label>`
-    + `<span class="hfe" title="Движок меняется для всего приложения: ⚙ › Движок">${engineName()}</span>`
-    + `<span class="sep"></span><button class="wide" data-a="reload" title="Обновить страницу · ⌘R в фрейме">Обновить</button><button class="wide" data-a="open" title="Открыть страницу в новой вкладке">Открыть</button><button class="wide pri" data-a="done" title="Готово · Esc">Готово</button>`;
+  b.innerHTML = PRESETS.map(([n, w, h]) => `<button class="wide" data-pre="${w}x${h}" title="${t(n)}: ${w}×${h}">${t(n)}</button>`).join("")
+    + `<span class="sep"></span><label class="hfsz" title="${t("Page size in CSS pixels: type a number or drag the frame's edge")}"><input data-w inputmode="numeric" aria-label="${t("Page width")}">×<input data-h inputmode="numeric" aria-label="${t("Page height")}"></label>`
+    + `<span class="hfe" title="${t("The engine changes for the whole app: ⚙ › Engine")}">${engineName()}</span>`
+    + `<span class="sep"></span><button class="wide" data-a="reload" title="${t("Reload page · ⌘R in the frame")}">${t("Reload")}</button><button class="wide" data-a="open" title="${t("Open page in a new tab")}">${t("Open")}</button><button class="wide pri" data-a="done" title="${t("Done · Esc")}">${t("Done")}</button>`;
   b.addEventListener("click", e => {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pre) { const [w, h] = t.dataset.pre.split("x").map(Number); return preset(w, h); }
@@ -101,23 +102,24 @@ function dockBar() {
 async function newFrame() {
   const d = new Date(), z = n => String(n).padStart(2, "0"), stamp = `${String(d.getFullYear()).slice(2)}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
   const src = `html/${stamp}/index.html`;
-  const page = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Фрейм ${stamp}</title>
+  // the starter page speaks the interface's language (owner 2026-10-06)
+  const page = `<!doctype html><html lang="${lang(HY)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${t("Frame {stamp}", { stamp })}</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.5 -apple-system,system-ui,sans-serif;background:#f4f3ef;color:#1d1d1f}main{max-width:40ch;padding:24px}h1{font-size:28px;margin:0 0 8px}</style>
-</head><body><main><h1>Новый фрейм</h1><p>Файл ${src} в папке проекта. Его пишет агент или ты, холст показывает его живым по двойному клику.</p></main></body></html>`;
-  const r = await fetch(`/api/file?p=${enc(src)}`, { method: "POST", body: page }); if (!r.ok) return HY.toast("Фрейм не создан: " + await r.text(), "error");
+</head><body><main><h1>${t("New frame")}</h1><p>${t("File {src} in the project folder. An agent or you write it, the canvas shows it live on a double-click.", { src })}</p></main></body></html>`;
+  const r = await fetch(`/api/file?p=${enc(src)}`, { method: "POST", body: page }); if (!r.ok) return HY.toast(t("Frame not created: {e}", { e: await r.text() }), "error");
   const c = HY.viewCenter(), w = 720, before = HY.snap(), id = HY.uid("h");
   HY.board.items[id] = { type: TYPE, src, vw: 1440, x: Math.round(c.x - w / 2), y: Math.round(c.y - 225), w, h: 450 };
-  HY.commit(before, "HTML-фрейм"); HY.select([id]); setTimeout(() => goLive(id), 50);
+  HY.commit(before, t("HTML frame")); HY.select([id]); setTimeout(() => goLive(id), 50);
 }
 
 export function register(hy) {
-  HY = hy;
+  HY = hy; t = translator(hy);
   const st = document.createElement("style"); st.textContent = `
     .plg[data-type=${TYPE}] { background: var(--raise); }
     .plg[data-type=${TYPE}] img.hf { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
     .plg[data-type=${TYPE}] .hb { position: absolute; left: calc(6px / var(--z)); bottom: calc(6px / var(--z)); padding: 0 calc(6px / var(--z)); height: calc(22px / var(--z)); border-radius: calc(6px / var(--z));
       display: grid; place-items: center; background: rgba(20,20,22,.72); color: #fff; font: 700 calc(11px / var(--z)) var(--sans); letter-spacing: .03em; pointer-events: none; white-space: nowrap; }
-    .plg[data-type=${TYPE}].making .hb::after { content: " · снимок…"; font-weight: 500; }
+    .plg[data-type=${TYPE}].making .hb::after { content: ${JSON.stringify(" · " + t("still…"))}; font-weight: 500; }
     .plg[data-type=${TYPE}].plg-live { overflow: hidden !important; }
     .plg[data-type=${TYPE}].plg-live img.hf, .plg[data-type=${TYPE}].plg-live .hb { visibility: hidden; }
     .plg[data-type=${TYPE}] iframe.hfl { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; background: #fff; }
@@ -131,6 +133,7 @@ export function register(hy) {
   // a click anywhere else on the board ends the live page, as «Готово» does
   document.addEventListener("pointerdown", e => { if (!L.id) return; if (e.target.closest(`.plg[data-id="${L.id}"], #dock, .tidy, .he, #ctx`)) return; stop(); }, true);
   hy.register(TYPE, {
+    opacity: true,   // the pictures' opacity: the bar's slider, the keys 1…9 and 0, «Copy properties» (owner 2026-10-06)
     render(card, it, id) {
       id = id || card.dataset.id;
       if (L.id === id) { if (!card.contains(L.frame) && L.frame) card.appendChild(L.frame); sizeFrame(); return; }
@@ -141,10 +144,10 @@ export function register(hy) {
     dblclick(id) { goLive(id); },
     onKey(e) { if (L.id && e.key === "Escape") { stop(); return true; } return false; },
     info(id, it) {
-      return { name: it.name || "HTML-фрейм", meta: `${it.vw}×${vhOf(it)} · ${it.src}`,
-        text: `Двойной клик: живая страница, края рамки меняют ее размер. Файл ${it.src} в папке проекта, его пишет агент.` };
+      return { name: it.name || t("HTML frame"), meta: `${it.vw}×${vhOf(it)} · ${it.src}`,
+        text: t("Double-click: the live page · its edges resize it") };
     },
   });
-  hy.addButton(ICON, "HTML-фрейм: живая страница на холсте, двойной клик, чтобы листать и нажимать", newFrame);
+  hy.addButton(ICON, t("HTML frame: a live page on the canvas, double-click to scroll and click"), newFrame);
   registerImageFrame(hy);
 }

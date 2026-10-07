@@ -36,8 +36,8 @@ class H(http.server.SimpleHTTPRequestHandler):
         if not rng or not os.path.isfile(path):
             return super().do_GET()
         size = os.path.getsize(path); m = re.match(r"bytes=(\d*)-(\d*)", rng)
-        a = int(m.group(1)) if m.group(1) else 0
-        b = int(m.group(2)) if m.group(2) else size - 1
+        a = int(m.group(1)) if m.group(1) else max(0, size - int(m.group(2) or size))   # «bytes=-3»: the last 3 bytes
+        b = int(m.group(2)) if m.group(1) and m.group(2) else size - 1
         b = min(b, size - 1)
         self.send_response(206)
         self.send_header("Content-Type", self.guess_type(path)); self.send_header("Accept-Ranges", "bytes")

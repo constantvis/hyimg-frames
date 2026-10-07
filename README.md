@@ -1,119 +1,57 @@
-# Hyimg-frames
+# Hyimg Frames
 
-![Редактор фрейма на доске: слои и Color Grading](docs/images/editor-color-grading.webp)
-![Карточка фрейма на доске Hyimg](docs/images/frame-card.webp)
+A plugin for [Hyimg](https://github.com/constantvis/Hyimg), the local Figma + Lightroom + Miro for working with AI agents. It adds two kinds of frames to the board: an image frame with its own editor, and an HTML frame that shows a live web page as a card. [Русская версия](README.ru.md).
 
-Редактор фрейма со слоем Color Grading прямо на доске, ниже карточка фрейма среди картинок
+![The frame editor on the board: layers and Raw Editor](docs/images/editor-color-grading.webp)
 
-Плагин холста Hyimg: фреймы. Два типа: HTML-фрейм (живая страница как карточка) и фрейм картинок со своим редактором.
+## Image frames
 
-## Установка
+Select pictures or a group on the board and press ⌥⌘G (or right click › Into one frame). ⌥⇧⌘G makes a separate frame for each picture. Frames are purple, so you can tell them from pictures at a glance.
 
-Плагин работает внутри Hyimg (https://github.com/constantvis/Hyimg). Проще всего поставить его скриптом Hyimg, он кладет эту папку рядом с `hyimg` и ставит ссылку:
+Double click a frame, or press Enter, and the editor opens right where the frame lies. The board doesn't reload or change zoom: the tools slide in on the left, the panels on the right, and the dock turns into the editor's dock. Esc, Cancel or Save brings back the selection and the view you had before.
+
+A double click on a plain picture opens the same editor, like Image in the dock's mode switch. The picture becomes a frame of its own in its place, and the frame stays only if you save; after Cancel the picture is back as it was, with nothing in the board's history. Until the first Save that frame lives only in memory, so a cancelled double click writes nothing to the library. While it is being made the switch already shows Image and the card shimmers like the dock. Cropping a picture is the Crop button on the bar over it, or C. Inside:
+
+- layers, groups, clipping masks, masks you paint with ⌥, a brush, an eyedropper, selections, free transform with a movable pivot;
+- masks the Photoshop way: ⌫ and ⇧⌫ in a selection hide and show, ⌘I inverts, Contract/Expand and Smooth, ⌘C ⌘V of a mask between layers and through a picture, a drag of its thumbnail (⌥ copies), the mask plate at the bottom with how the mask shows; ⌥-click on the line between layers clips, a right click everywhere, a colour for any row;
+- Raw Editor layers in the spirit of Camera Raw (also on any picture of the board, without opening the editor): white balance, tone, curves, color mixer, grading wheels;
+- Select Subject and Remove Background through macOS Vision, about half a second;
+- Spot Healing and Content-Aware Fill with LaMa, running locally on the CPU (about 2.6 s per patch);
+- pictures dragged in from the library as new layers.
+
+The originals are never written. A frame keeps links to its source files plus its own masks and painted layers, and Save renders it to a file the size of the document (up to 8000 × 8000 px). Every Save is a new version, so ⌘Z on the board really goes back. The last 10 versions are kept.
+
+![A frame card among pictures on the board](docs/images/frame-card.webp)
+
+## HTML frames
+
+Put a page in the project folder at `html/<name>/index.html`. At rest the card shows a still of the page; double click makes it live, and dragging the frame's edges changes the page's viewport, with device sizes in the dock.
+
+## Install
 
 ```sh
-cd hyimg && ./scripts/install_plugins.sh --frames          # --lama дополнительно скачает модель заливки
+cd hyimg && ./scripts/install_plugins.sh --frames    # add --lama to download the fill model too
 ```
 
-Вручную: склонировать репозиторий и сделать ссылку `ln -s <путь к hyimg-frames> ~/Library/Application\ Support/Hyimg/plugins/frames`, потом перезапустить сервер Hyimg (⇧⌘R).
+Or by hand: clone this repository and run `ln -s <path to hyimg-frames> ~/Library/Application\ Support/Hyimg/plugins/frames`, then View › Restart server (⇧⌘R) in Hyimg.
 
-Что нужно:
+What it needs:
 
-- macOS Vision для маски объекта, он встроен в систему.
-- Для заливки с учетом содержимого: `python3 -m pip install onnxruntime` и модель LaMa (`lama_fp32.onnx`, около 208 МБ, Apache-2.0, https://huggingface.co/Carve/LaMa-ONNX) в `~/Library/Caches/Hyimg/models/lama/`. Без модели редактор заливает проще, без нейросети.
-- Для снимков HTML-фреймов: Playwright с Chromium (`python3 -m pip install playwright && python3 -m playwright install chromium`).
+- macOS Vision for subject masks (built in).
+- For content-aware fill: `python3 -m pip install onnxruntime` and the LaMa model (`lama_fp32.onnx`, about 208 MB, Apache-2.0, https://huggingface.co/Carve/LaMa-ONNX) in `~/Library/Caches/Hyimg/models/lama/`. Without the model the editor falls back to a simpler fill.
+- For HTML stills: Playwright with Chromium (`python3 -m pip install playwright && python3 -m playwright install chromium`).
 
-**Агенту:** не ставь плагин и не качай модель молча. Спроси человека, нужен ли ему плагин «Фреймы» (редактор картинок на доске и HTML-фреймы), и отдельно, скачать ли модель LaMa около 208 МБ. Ставь только после «да».
+**For agents:** don't install the plugin or download the model silently. Ask the person whether they want Frames (an image editor on the board, plus HTML frames), and separately whether to download the 208 MB LaMa model. Install only after a yes. To work with frames, use `hy.py do 'frame …'` (`frame`, `frame each`, `frame unframe`, `frame rename`, `frame layers`); `hy.py map` lists frames with the pictures inside them.
 
-## Как устроено
+## Files
 
-- Страница лежит в папке проекта `html/<имя>/index.html` со своими css, js и картинками, сервер Hyimg отдает ее по пути `/lib/...`.
-- В покое карточка показывает снимок страницы (`<папка>/.stills/<имя>-<ширина>x<высота>.png`), его делает сервер в Chromium.
-- Двойной клик: страница живая, края рамки меняют ширину и высоту страницы, в доке размеры устройств, ввод размера, «Обновить», «Открыть», «Готово». Esc или клик мимо тоже закрывают.
-- Агент кладет фрейм: `python3 <hyimg>/review/hy.py do 'htmlframe html/<имя>/index.html x=0 y=0 w=720 vw=1440 vh=900'`.
+- `canvas.js`, `imgframe.js`: the board side (cards, making and unframing, the in-place editor host).
+- `editor/`: the editor (`index.html`) and its modules: Raw Editor (`colorgrade.js`, `selcolor.js`), masks (`maskwork.js`), copy and paste (`clipwork.js`), the selection (`selwork.js`), the right click and the layer list's extras (`menus.js`).
+- `inpaint/`: LaMa fill, macOS Vision subject masks, and the plugin's server routes (`POST /api/plugin/frames/<route>`).
+- `tests/`: `HYIMG_REPO=<path to hyimg> python3 -m pytest tests/` (the main flow runs in Chromium and WebKit).
 
-Тест: `HYIMG_REPO=<hyimg> python3 -m pytest tests/test_frames.py`.
+**For agents changing the code:** a source file stays around 1000 lines (the check fails above 1100) and a line around 160 characters (fails above 200). A file near the limit is split by responsibility, one concern per module. The rule and its exceptions are in Hyimg's `AGENTS.md`, section «Размер файлов». `scripts/check.sh --fast` in `hyimg` checks this repository too.
 
-Дальше (владелец 2026-10-04): фрейм картинок сделан (ниже), впереди простой видеоредактор (обрезка, размер, частота кадров, перекодирование через ffmpeg).
+## License
 
-## Фрейм картинок (фаза 1 и доработка 2026-10-05)
-
-Как сделать фрейм:
-
-- Выдели на доске картинки или группу. В правом клике и на плашке над выделением два пункта: «В один фрейм» (⌥⌘G) кладет все картинки в один фрейм, «Каждый в свой фрейм (N)» (⌥⇧⌘G) делает отдельный фрейм на месте и в размере каждой картинки. Число в скобках показывает, сколько картинок станет фреймами. Группа отдает все свои картинки, вложенные группы тоже, сама группа остается вокруг новых карточек. Все это один шаг ⌘Z.
-- Размер документа берется из пикселей самих картинок: самая большая остается в своем разрешении, даже если на доске она маленькая. Сторона больше 8000 px уменьшается до 8000, об этом говорит уведомление.
-- Фреймы фиолетовые, чтобы их не путать с картинками: рамка выделения, ручки, обводка при наведении и круглый значок в левом нижнем углу карточки (там, где у копии картинки значок копии). Если карточка фрейма сама копия другого фрейма, рядом стоит и значок копии. Размер документа виден в карточке справа и в подсказке значка.
-- Выделенный фрейм: на плашке «Открыть», Enter или двойной клик открывают редактор.
-
-Редактор открывается прямо на доске (решение владельца 2026-10-05: ничего не мигает, мы остаемся на том же холсте):
-
-- Камера и масштаб доски не меняются. Остальная доска мягко притемняется вокруг фрейма, слева выезжают инструменты, справа панели (Properties, Adjustments, History, Layers, Channels), под верхней строкой панель параметров. Док доски превращается в док редактора (масштаб и Actions ⌘K), в крошке доски появляется имя фрейма, справа вверху Cancel и Save. Выход повторяет те же движения назад.
-- Масштаб и сдвиг в редакторе двигают саму доску: камера одна.
-- Страница редактора загружается заранее, как только на доске есть фрейм, поэтому фрейм появляется сразу, а слои в полном разрешении догружаются за ним (картинки декодируются вне главного потока).
-- Уведомления на время редактора опускаются под верхнюю строку (60 px).
-- Круглая кнопка библиотеки приложения открывает настоящую библиотеку рядом с редактором. Картинки из нее перетаскиваются прямо на холст редактора: каждая становится закрепленным оригиналом в своих пикселях в точке, куда ее бросили (если она больше документа, то вписывается). Файлы из Finder тоже можно бросать.
-- Клик по имени фрейма в крошке открывает меню фрейма, двойной клик переименовывает. Home и проект в крошке уводят через вопрос о сохранении, доска и страница закрывают редактор.
-
-Сохранение версиями (владелец 2026-10-05: ⌘Z на доске должен по-настоящему отменять):
-
-- Каждый Save пишет новую версию рядом со старыми: `frame.<n>.json`, `render.<n>.png`, измененные маски и нарисованные слои как `<id>.<n>.png`. Старые файлы не перезаписываются. Карточка указывает на свою версию (`doc`, `render`, `v`).
-- ⌘Z на доске после Save возвращает карточку к прошлой версии, ее файлы на месте, ⌘⇧Z ведет вперед.
-- Остаются последние 10 версий фрейма. Более старые удаляет сервер плагина вместе с файлами, которые были нужны только им, и только в папке этого фрейма.
-- Фреймы фазы 1 (`frame.json`, `render.png` без номера) открываются как версия 0, первый Save пишет версию 1.
-
-Что лежит на диске. Все файлы фрейма живут в его папке `frames/<дата-время-код>/` в библиотеке проекта, сервер не дает плагину писать ничего другого:
-
-- `frame.<n>.json`: документ. Поля: `name`, `size` [W, H], `background`, `order` "bottom-to-top", `layers`, `guides`, `v`, `render`. Слой `pic` ссылается на исходник в библиотеке (`path`, `crop`, положение в пикселях документа, `board` с тем, где картинка лежала на доске). Слой `paint` хранит пиксели в своем файле `layers/<id>.<n>.png`. Слой `grade` хранит настройки Color Grading. Слой `group` держит `children`. Маска лежит в `masks/<id>.<n>.png`. Полное описание в `editor/index.html` у функции `docJSON`.
-- `render.<n>.png`: картинка фрейма в размере документа.
-- Исходные картинки только читаются. Папка `frames/` не показывается в библиотеке, так же как `html/`.
-
-Как это видит агент:
-
-- `python3 <hyimg>/review/hy.py map` показывает фреймы строкой `F «Фрейм 1» 8000×3478 px · картинок 3: ...` с путями картинок внутри.
-- `hy.py find k-vault` находит и картинку внутри фрейма: `pic shell/k-vault.jpg во фрейме «Фрейм 1»`.
-- Команды внутри `hy.py do`: `frame ССЫЛКИ... [name="Имя"]` делает один фрейм (картинки по id, маске пути, группа со вложенными, зона заметки), `frame each ССЫЛКИ...` делает фрейм на каждую картинку, `frame unframe Ф` разбирает фрейм, `frame rename Ф "Имя"` пишет новую версию с новым именем, `frame layers Ф` печатает слои сверху вниз и ничего не сохраняет. Фрейм называется по имени или id.
-- Карточка на доске: `{type: "imgframe", x, y, w, h, name, doc, render, v, rv, size, pics}`. `pics` дублирует список картинок из документа, чтобы доска и сервер считали их лежащими на странице без чтения файлов.
-
-Ввод чисел (владелец 2026-10-05: «1239px + 10 = 1249px, 100px + 10% = 110px»). Одно правило в редакторе и в Color Grading (`editor/colorgrade.js` и копия в `Concepts/html/_lib`):
-
-- Просто число задает значение: `800`, `800px`. `50%` задает долю от опорного значения (для W и H от размера документа).
-- Текст, который начинается с `+`, `-`, `*` или `/`, работает с текущим значением: `+10` прибавляет 10, `-10` отнимает 10, `+10%` прибавляет десятую часть, `-10%`, `*2`, `/2`.
-- Целое выражение тоже работает: `1239+10`, `100+10%`, `800/2`.
-- Точное отрицательное число на ползунке со знаком пишется как `0-10`, это сказано в подсказке поля. Старые `++5` и `=` больше не работают.
-
-Заплатка и заливка с учетом содержимого на бордовом (владелец видел пятно светлее фона). Замер на `Concepts/html/_media/burgundy-03-v03.jpg` в макете, где на бордовый наложен цветной тинт: LaMa заполняет сильные цвета чуть серее (насыщенность ниже на 3 до 4 единиц Lab, светлота ниже на 1), на глаз пятно выглядит светлым и выцветшим. Теперь заливка сдвигается к цвету спокойного окружения дыры (`seam_match` в `inpaint/lama.py`): насыщенность ниже на 1, светлота ниже на 0.4. Запасная заливка без нейросети берет цвета только из полосы рядом с дырой. Сбой сети больше не переключает редактор на запасную заливку до конца сеанса.
-
-WebKit (приложение работает в WKWebView). В WebKit нет `filter` у холста 2D, поэтому размытие масок, растушевка выделения и мягкий край заплатки там молча не работали и край выходил жестким. Теперь размытие делается уменьшением и увеличением холста, если фильтра нет (`blurInto`). Миниатюры каналов в панели Channels в WebKit пока рисуются без разделения на каналы. Остальное проверено в WebKit тестом и вручную: открытие на месте, сохранение, отмена на доске, перетаскивание из библиотеки.
-
-Время на этом Mac (два снимка по 17 Мп, безголовые Chromium и WebKit). Раньше редактор появлялся только после загрузки своей страницы и всех слоев: 130 до 440 мс, а если шрифты Google отвечают медленно (2 с), то 2.3 с на каждое открытие, потому что страница создавалась заново. Сейчас фрейм виден в редакторе через 6 до 60 мс после двойного клика, слои готовы через 90 до 180 мс, медленные шрифты на открытие не влияют.
-
-Серверная часть плагина. В `manifest.json` указан `"server": "inpaint/routes.py"`. Сервер Hyimg отдает его маршруты по адресу `POST /api/plugin/frames/<маршрут>`:
-
-- `inpaint`: заливка LaMa (`inpaint/lama.py`), модель загружается один раз и остается в процессе сервера. Без файла модели ответ 503, и редактор заливает сам, без нейросети.
-- `subject`: маска объекта через macOS Vision (`inpaint/subject.py`), около 0.5 с.
-- `versions`: какие версии фрейма есть на диске и какой номер следующий.
-- `prune`: оставляет последние 10 версий фрейма.
-
-Тесты: `HYIMG_REPO=<hyimg> python3 -m pytest tests/`. В `tests/test_imgframe.py` основной путь идет и в Chromium, и в WebKit (`python3 -m playwright install webkit`), `FRAMES_SHOTS=<папка>` сохраняет скриншоты шагов. `tests/test_numbers.py` проверяет правило ввода чисел во всех четырех копиях.
-
-Дальше, фаза 2: вложенные фреймы как смарт-объекты, пакетная правка нескольких фреймов одной цветокоррекцией (код пакета в редакторе есть, но не подключен), значок с числом мест на карточке картинки в медиатеке, видеофреймы.
-
-## Фрейм на доске (решения владельца 2026-10-05)
-
-- [сделано] Создание как в Figma: выделить одну или несколько картинок, ⌥⌘G или «В один фрейм» в правом клике. Картинки переходят внутрь фрейма, а не копируются. «Каждый в свой фрейм» (⌥⇧⌘G) делает фрейм на каждую картинку.
-- [сделано] Двойной клик по фрейму открывает редактор картинок прямо на доске, без отдельного окна. Макет: `Concepts/html/editor-a/index.html` (раскладка как в Photoshop: инструменты слева, свойства и слои справа, меню редактора сверху, док доски снизу).
-- [сделано] Картинка во фрейме считается лежащей на доске, внутри фрейма. Дубль считается по тем же правилам, что сейчас: если та же картинка лежит еще где-то. Кнопка «К оригиналу» по-прежнему ведет только между картинками на доске, во фрейм она не переходит.
-- [сделано] Фрейм хранит ссылки на исходные файлы, маски и настройки слоев. Исходники не меняются. При выходе из редактора фрейм рисуется в файл размером документа, на доске виден этот рендер.
-- [сделано] Внутренний размер документа не больше 8000 × 8000 px, размер фрейма на доске любой, пропорции у них общие. Если собранные картинки занимают больше 8000 px (лежат далеко друг от друга), фрейм уменьшается до предела, и об этом говорит уведомление.
-- [фаза 2] Смарт-объекты внутри фрейма, как компоненты в Figma: вложенный фрейм. Открывается двойным кликом, рисуется в свою картинку, его копии ссылаются на один источник.
-- [фаза 2] В медиатеке на карточке картинки значок с числом мест, где она лежит, по клику список мест (отдельно на странице, во фрейме) с переходом.
-
-## Заливка с учетом содержимого (`inpaint/`)
-
-- `inpaint/lama.py`: открытая модель LaMa (Apache-2.0) на этом Mac через onnxruntime, без сети. Модель `lama_fp32.onnx` (208 МБ) лежит в `~/Library/Caches/Hyimg/models/lama/`. Большая картинка заливается в квадрате вокруг маски, уменьшенном до 512 px, назад кладутся только пиксели под маской.
-- Время на Mac владельца: загрузка модели около 3.5 с, дальше около 2.6 с на участок. CoreML не ускоряет (59 с): в модели есть преобразование Фурье, которое Core ML не умеет.
-- `inpaint/serve.py`: сервер макетов редактора для `Concepts/html` с `POST /api/inpaint`, `POST /api/subject` и диапазонами байт для видео. Маршруты берет из `inpaint/routes.py`, тех же, что отдает сервер Hyimg.
-
-## Лицензия
-
-[PolyForm Noncommercial 1.0.0](LICENSE): пользоваться, изучать и менять бесплатно для себя и для некоммерческих целей. Коммерческое использование только с разрешения автора, напишите через GitHub. Сторонний код в `vendor/` остается под своими лицензиями.
+[PolyForm Noncommercial 1.0.0](LICENSE): free to use, study and change for yourself and for noncommercial purposes. Commercial use only with the author's permission.

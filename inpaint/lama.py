@@ -25,7 +25,7 @@ def session():
         if _sess is None:
             import onnxruntime as ort
             if not os.path.exists(MODEL):
-                raise FileNotFoundError(f"нет модели LaMa: {MODEL}")
+                raise FileNotFoundError(f"The LaMa model is missing: {MODEL}")
             o = ort.SessionOptions(); o.log_severity_level = 3
             _sess = ort.InferenceSession(MODEL, o, providers=["CPUExecutionProvider"])
         return _sess
@@ -82,7 +82,7 @@ def seam_match(src, out, hole):
     calm = float(np.clip(1 - (spread - 6) / 14, 0, 1))
     shift = np.clip(est[hole].mean(0) - o[hole].mean(0), -14, 14) * calm
     o[hole] += shift
-    return np.clip(o, 0, 255).astype(np.uint8)
+    return np.clip(np.rint(o), 0, 255).astype(np.uint8)   # rounded: truncating made a calm fill one level darker (unit test, 2026-10-06)
 
 
 def fill(rgb, mask, feather=2):

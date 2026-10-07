@@ -1,7 +1,8 @@
 {
- "title": "Фреймы",
+ "title": "Frames",
+ "title_ru": "Фреймы",
  "version": "0.3.0",
  "canvas": "canvas.js",
- "about": "Фреймы на холсте Hyimg: HTML-страница как карточка, живая по двойному клику; фрейм картинок с редактором (слои, маски, кисть, заливка с учетом содержимого, цветокоррекция), исходники не меняются",
+ "about": "Frames on the Hyimg canvas: an HTML page as a card, live on a double-click; an image frame with its editor (layers, masks, brush, content-aware fill, color grading), the originals never change",
  "server": "inpaint/routes.py"
 }
