@@ -20,6 +20,7 @@
 import { translator } from "./lang.js";   // English or Russian, as the board is set (owner 2026-10-06)
 import { registerGrade, dress, loadCG } from "./grade.js";   // the colour grade of any picture and frame card (owner 2026-10-06), its own module
 import { registerMask, dressMask, maskCanvas } from "./mask.js";   // the master mask of any picture and frame card (owner 2026-10-06)
+import { studioDock } from "./studiodock.js";   // the studio's tools in the board's dock (owner 2026-10-08, round 11 D3)
 const TYPE = "imgframe", MAXDOC = 8000, KEEP = 10;
 // the menus' and the bar's icons are the app's (ui/icons.js, 15 px in the menus' 1.9 line; owner 2026-10-07: «одно значение, одна иконка»):
 // the image studio opens with its own icon, Image mode's; a frame taken apart wears «ungroup»
@@ -33,7 +34,7 @@ let t = k => k;   // the plugin's words (lang.js), set at register
 const picsWord = n => t("{n} images", { n: String(n) });
 const framesWord = n => t("{n} frames", { n: String(n) });
 const $ = s => document.querySelector(s);
-let HY, ED = null, making = false;   // ED: the open editor {id, ...}
+let HY, ED = null, making = false, DK = null;   // ED: the open editor {id, ...}; DK: its tools in the dock (studiodock.js)
 
 const canGo = it => HY.isPic(it) && !VIDEO.test(it.path || "");   // pictures go in; a video frame is phase 2
 const isFrame = it => !!it && it.type === TYPE;
@@ -106,10 +107,12 @@ async function buildFrame(ids, name, nat, mem = null) {
     if (!it.grade || !window.HyColorGrade) return [pic];
     return [pic, { id: `g${i + 1}_${Math.random().toString(36).slice(2, 6)}`, kind: "grade", name: t("Raw Editor"), params: window.HyColorGrade.normalize(it.grade),
       visible: true, opacity: 100, fill: 100, blend: "source-over", clip: true, locks: { alpha: false, pixels: false, pos: false, all: false } }]; });
-  const doc = { version: 1, v: V, name, size: [W, H], background: "#ffffff", order: "bottom-to-top", layers, render: `${dir}/render.${V}.png`, created: new Date().toISOString() };
-  // the first render: the pictures with their crop on white, as they lay on the board
+  // a new frame's background is transparent (owner 2026-10-09: «по дефолту прозрачный должен быть»); a frame saved before keeps its own
+  const doc = { version: 1, v: V, name, size: [W, H], background: null, order: "bottom-to-top", layers, render: `${dir}/render.${V}.png`,
+    created: new Date().toISOString() };
+  // the first render: the pictures with their crop as they lay on the board, on nothing (the PNG keeps its alpha)
   const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(W * k)); c.height = Math.max(1, Math.round(H * k));
-  const x = c.getContext("2d"); x.setTransform(k, 0, 0, k, 0, 0); x.fillStyle = "#ffffff"; x.fillRect(0, 0, W, H); x.imageSmoothingQuality = "high";
+  const x = c.getContext("2d"); x.setTransform(k, 0, 0, k, 0, 0); x.imageSmoothingQuality = "high";
   let cgr = null;
   for (const [j, l] of layers.entries()) {
     if (l.kind !== "pic") continue;
@@ -138,7 +141,8 @@ async function buildFrame(ids, name, nat, mem = null) {
   await out(`${dir}/frame.${V}.json`, JSON.stringify(doc, null, 1));
   const rr = await out(`${dir}/render.${V}.png`, blob);
   return { capped, card: { type: TYPE, x: Math.round(bb.x), y: Math.round(bb.y), w: Math.round(bb.w), h: Math.round(bb.h), name, doc: `${dir}/frame.${V}.json`,
-    render: `${dir}/render.${V}.png`, v: V, rv: Math.round(rr.mtime / 1e6), size: [W, H], pics: [...new Set(layers.map(l => l.path).filter(Boolean))] } };
+    render: `${dir}/render.${V}.png`, v: V, rv: Math.round(rr.mtime / 1e6), size: [W, H], pics: [...new Set(layers.map(l => l.path).filter(Boolean))],
+    alpha: true } };
 }
 
 // «В один фрейм» (each = false) or «Каждый в свой фрейм» (each = true): one step to undo for all of it
@@ -161,7 +165,7 @@ async function makeFrames(sel, each) {
     made.forEach(card => { const id = HY.uid("f"); HY.board.items[id] = card; nids.push(id); });
     HY.regroup(nids); HY.sel = new Set(nids);   // the cards fall into the groups their pictures were in
     HY.commit(before, capped ? t("Frame reduced to 8000 px: the images lie far apart")
-      : each ? t("{frames}: each image in its own, double-click opens the editor", { frames: framesWord(made.length) }) : t("Frame: {pics} inside, double-click opens the editor", { pics: picsWord(ids.length) }));
+      : each ? t("{frames}: each image in its own, double-click opens Image Studio", { frames: framesWord(made.length) }) : t("Frame: {pics} inside, double-click opens Image Studio", { pics: picsWord(ids.length) }));
     preload();
   } catch (e) { HY.toast(t("Frame not made: {e}", { e: e.message }), "error"); }
   finally { making = false; }
@@ -197,7 +201,7 @@ async function explode(id) {
 async function wrapPic(id) {
   const it = HY.board.items[id]; if (making || !it || !canGo(it)) return null;
   making = true; editorFrame();   // the studio's page loads while the frame is made
-  if (HY.busy) HY.busy("studio", t("Opening the image studio"), id);   // the dock's sweep, on the card too, until the studio shows
+  if (HY.busy) HY.busy("studio", t("Opening Image Studio"), id);   // the dock's sweep, on the card too, until the studio shows
   try {
     dropMem();
     const nat = await naturalSizes([it.path], [it]), r = await buildFrame([id], frameName(), nat, MEM);
@@ -223,7 +227,7 @@ let EDF = null, edReady = null, preT = 0;
 function editorFrame() {
   if (EDF) return edReady;
   const wrap = document.createElement("div"); wrap.className = "ifed";
-  const f = document.createElement("iframe"); f.title = t("Frame editor"); f.setAttribute("allowtransparency", "true");
+  const f = document.createElement("iframe"); f.title = t("Image Studio"); f.setAttribute("allowtransparency", "true");
   wrap.appendChild(f); HY.stage.appendChild(wrap);
   EDF = { wrap, f };
   const ready = () => new Promise(res => {
@@ -282,7 +286,7 @@ function closing() {
   if (card) card.classList.remove("ifhide");
   if (ED.wrap) { unwrap(ED.id, ED.wrap); ED.wrap = null; }   // left without a Save: the picture, as it was
   veil(null, false); document.documentElement.classList.remove("ifedit");
-  crumbStep(null); dockSwap(null);
+  crumbStep(null); dockSwap(null); if (DK) { DK.destroy(); DK = null; }
   try { EDF.f.blur(); window.focus(); } catch {}   // the keys go to the board again (⌘Z right after a Save undoes it on the board)
 }
 function closed() {
@@ -371,13 +375,20 @@ function renameStep() {
   inp.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); });
   inp.addEventListener("blur", () => done(true));
 }
-// the board's dock becomes the editor's (zoom and Actions); its width eases from one to the other
+// the board's dock becomes the studio's: its tools, colours, zoom and Actions (studiodock.js; owner 2026-10-08, D3); its width eases from
+// one to the other. A studio page without the dock's side (editor/dockwork.js) gets the zoom and Actions alone
 function editorDock() {
   const n = document.createElement("span");
   n.innerHTML = `<button class="wide" id="ifZoom" title="${t("Fit on screen · ⌘0")}">100%</button><span class="sep"></span><button class="wide" id="ifActs" title="${t("Actions · ⌘K")}">${IC.cmd}${t("Actions")}<kbd>⌘K</kbd></button>`;
-  n.querySelector("#ifZoom").onclick = () => ED && ED.win && ED.win.__ed.fitView();
-  n.querySelector("#ifActs").onclick = () => { if (ED && ED.win) { const e = ED.win.__ed; e.actsOpen() ? e.closeActs() : e.openActs(); } };
-  return n;
+  const zoom = n.querySelector("#ifZoom"), acts = n.querySelector("#ifActs"), back = () => setTimeout(() => { try { ED && ED.win && ED.win.focus(); } catch {} }, 0);
+  zoom.onclick = () => { if (ED && ED.win) { ED.win.__ed.fitView(); back(); } };
+  acts.onclick = () => { if (ED && ED.win) { const e = ED.win.__ed; e.actsOpen() ? e.closeActs() : e.openActs(); } };
+  const K = ED && ED.win && ED.win.hyEdK;
+  if (DK) { DK.destroy(); DK = null; }
+  if (!K || !K.dock) return n;
+  n.querySelector(".sep").remove();
+  DK = studioDock({ t, win: ED.win, K, zoom, acts });
+  return DK.node;
 }
 function dockSwap(node) {
   const d = $("#dock"); if (!d) return HY.dock(node);
@@ -423,7 +434,7 @@ function card(el, it, id) {
 // the selection's frame actions, for the right click and the bar over the selection
 function actions(ids) {
   const its = ids.map(i => HY.board.items[i]);
-  if (ids.length && its.every(isFrame)) return [{ icon: IC.open, label: t("Open"), keys: "↵", title: t("Open frame editor · Enter"), fn: () => openEditor(ids[0]) }];
+  if (ids.length && its.every(isFrame)) return [{ icon: IC.open, label: t("Open"), keys: "↵", title: t("Open in Image Studio · Enter"), fn: () => openEditor(ids[0]) }];
   const pics = picsOf(ids), hasGroup = ids.some(i => HY.board.groups[i]);
   if (!pics.length || (!hasGroup && !its.every(it => it && canGo(it)))) return [];
   const out = [{ icon: IC.frame, label: t("Make frame"), keys: "⌥⌘G", title: t("All {pics} in one frame · ⌥⌘G", { pics: picsWord(pics.length) }), fn: () => makeFrames(ids, false) }];
@@ -436,7 +447,7 @@ export function register(hy) {
   const st = document.createElement("style"); st.textContent = `
     /* frames are purple, not blue (owner 2026-10-05: «so it's clear what they are»): one token, a deeper one on the light theme */
     :root { --frame: #8b5cf6; } :root[data-theme=light] { --frame: #7c3aed; }
-    .plg[data-type=${TYPE}] { background: var(--raise); } .plg[data-type=${TYPE}].lo.see { background: transparent; }
+    .plg[data-type=${TYPE}] { background: var(--raise); } .plg[data-type=${TYPE}]:is(.lo.see, .ifhide) { background: transparent; }
     .plg[data-type=${TYPE}].sel { outline-color: var(--frame); }
     .plg[data-type=${TYPE}]:hover:not(.sel) { outline: calc(1.5px / var(--z)) solid color-mix(in srgb, var(--frame) 70%, transparent); outline-offset: calc(2px / var(--z)); }
     .plg[data-type=${TYPE}] img.ifr { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
@@ -452,7 +463,8 @@ export function register(hy) {
     .ifed.on { visibility: visible; pointer-events: auto; }
     .ifed iframe { display: block; width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; }
     /* the board around the open frame: the rest dims, its own chrome steps aside; the crumb and the dock stay over the editor */
-    #ifveil { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; z-index: 3; transition: opacity .45s cubic-bezier(.3,.8,.25,1); }
+    /* over the cards (z 2 as #items, later), under Hyimg's lift of the open frame (ui/editlift.js, z 3): its shadow lies over the dimmed board */
+    #ifveil { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; z-index: 2; transition: opacity .45s cubic-bezier(.3,.8,.25,1); }
     #ifveil.on { opacity: 1; }
     #ifveil i { position: absolute; background: color-mix(in srgb, var(--board, #17171a) 58%, transparent); }
     :is(#info, #handles, #bhist, #bkeys, #bntf, #bset, #ntf, #hist, #sets, #keys, #pv, #jump, #hint, #ctx) { transition: opacity .25s cubic-bezier(.3,.8,.25,1); }
@@ -488,7 +500,7 @@ export function register(hy) {
     info(id, it) {
       const n = (it.pics || []).length;
       return { name: it.name || t("Frame"), meta: `${(it.size || [0, 0]).join("×")} px · ${picsWord(n)}` + (it.v ? t(" · version {v}", { v: String(it.v) }) : "") + ` · ${it.doc}`,
-        text: t("Double-click or Enter: the editor · the images inside never change") };
+        text: t("Double-click or Enter: Image Studio · the images inside never change") };
     },
   });
   hy.ctx((ids, id) => {
@@ -496,20 +508,23 @@ export function register(hy) {
     // a Hyimg that greys what does not apply (HY.menuOff, owner 2026-10-06: «I want users to know what functions exist»): one fixed list
     // for any selection, each item with its reason when it does not apply; an older one gets only what applies
     if (hy.menuOff) {
-      if (!ids.length) return [];
-      const one = ids.length === 1 && isFrame(its[0]), notOne = ids.length > 1 ? t("Select one frame") : t("Only for a frame");
-      const pics = picsOf(ids), can = pics.length && (ids.some(i => HY.board.groups[i]) || its.every(it => it && canGo(it)));
-      const why = its.some(isFrame) ? t("This is already a frame") : !can ? t("Only images go into a frame") : "";
-      return [
-        { icon: IC.open, label: t("Open frame editor"), keys: ["↵"], off: one ? "" : notOne, fn: () => openEditor(ids[0]) },
-        { icon: IC.unframe, label: t("Unframe"), off: one ? "" : notOne, fn: () => explode(ids[0]) },
-        { icon: IC.frame, label: t("Make frame"), keys: ["⌥", "⌘", "G"], off: why, fn: () => makeFrames(ids, false) },
-        { icon: IC.each, label: !why && pics.length > 1 ? t("Frame each ({n})", { n: String(pics.length) }) : t("Frame each"), keys: ["⌥", "⇧", "⌘", "G"],
-          off: why || (pics.length < 2 ? t("Only for 2 images or more") : ""), fn: () => makeFrames(ids, true) },
-      ];
+      // only what relates to the kinds clicked (owner 2026-10-07: «show only items that relate to the KIND of thing clicked»): a frame's own
+      // items when a frame is in it, making frames when pictures are; within those, grey with the reason
+      const frames = its.filter(isFrame), pics = picsOf(ids), out = [];
+      if (frames.length) {
+        const why = ids.length > 1 ? t("Select one frame") : "";
+        out.push({ icon: IC.open, label: t("Open in Image Studio"), keys: ["↵"], off: why, fn: () => openEditor(ids[0]) }, { icon: IC.unframe, label: t("Unframe"), off: why, fn: () => explode(ids[0]) });
+      }
+      if (its.some(it => it && canGo(it)) || (pics.length && ids.some(i => HY.board.groups[i]))) {
+        const why = frames.length ? t("This is already a frame") : its.every(it => !it || canGo(it)) ? "" : t("Only images go into a frame");
+        out.push({ icon: IC.frame, label: t("Make frame"), keys: ["⌥", "⌘", "G"], off: why, fn: () => makeFrames(ids, false) },
+          { icon: IC.each, label: !why && pics.length > 1 ? t("Frame each ({n})", { n: String(pics.length) }) : t("Frame each"), keys: ["⌥", "⇧", "⌘", "G"],
+            off: why || (pics.length < 2 ? t("Only for 2 images or more") : ""), fn: () => makeFrames(ids, true) });
+      }
+      return out;
     }
     if (ids.length === 1 && isFrame(its[0]))
-      return [{ icon: IC.open, label: t("Open frame editor"), keys: ["↵"], fn: () => openEditor(ids[0]) }, { icon: IC.unframe, label: t("Unframe"), fn: () => explode(ids[0]) }];
+      return [{ icon: IC.open, label: t("Open in Image Studio"), keys: ["↵"], fn: () => openEditor(ids[0]) }, { icon: IC.unframe, label: t("Unframe"), fn: () => explode(ids[0]) }];
     return actions(ids).map(a => ({ icon: a.icon, label: a.label, keys: a.keys.match(/[⌥⇧⌘]|↵|[A-Z]/g), fn: a.fn }));
   });
   if (hy.bar) hy.bar(ids => actions(ids.filter(id => HY.board.items[id] || HY.board.groups[id])));
@@ -519,9 +534,10 @@ export function register(hy) {
   // the frame editor is open, enabled when one frame or one picture is selected. A frame opens; a picture opens as a frame of its own that
   // stays only when it is saved (wrapPic; a double click on a picture comes here too, owner 2026-10-07). Leaving is the editor's own way
   // out (it asks about unsaved changes); the board's selection and view come back as they were
-  if (hy.mode) hy.mode("image", { label: t("Image"), order: 10, icon: hyIcon("image", 16),
-    title: t("Image studio for the selected frame or image"), hint: t("Select one image or frame: the image studio opens for it"),
-    isOpen: () => !!ED || !!PENDING,
+  // color: the chosen segment in the Studio's purple, not the board's blue (owner 2026-10-09: «вроде же бы в цвет режима должно быть?»)
+  if (hy.mode) hy.mode("image", { label: t("Image"), name: t("Image Studio"), order: 10, icon: hyIcon("image", 16), color: "var(--frame)",
+    title: t("Image Studio for the selected frame or image"), hint: t("Select one image or frame: Image Studio opens for it"),
+    isOpen: () => !!ED || !!PENDING, card: () => (ED && ED.id) || PENDING || null,   // the card Hyimg lifts while the studio is open
     target: ids => { const it = ids.length === 1 && HY.board.items[ids[0]]; return it && (isFrame(it) || canGo(it)) ? ids[0] : null; },
     async enter(id) {
       if (isFrame(HY.board.items[id])) return openEditor(id);

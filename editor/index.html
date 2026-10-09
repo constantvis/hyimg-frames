@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Frame editor</title>
+<title>Image Studio</title>
 <script src="/ui/settings.js"></script>   <!-- the app's settings (cv.paperDark and the rest), the same as the board's; first, before anything reads them -->
 <script src="/ui/menu.js"></script>       <!-- the app's one chevron (HY_CHEV) -->
 <script src="/ui/icons.js"></script>      <!-- the editors' one icon family (owner 2026-10-06): the tools look the same here and in the 3D studio -->
@@ -30,7 +30,7 @@
   const ls = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
   const t = ls('cv.theme', 'auto');
   de.dataset.theme = t === 'auto' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
-  de.dataset.shape = ls('cv.shape', 'round'); de.dataset.shadow = ls('cv.shadow', '1');
+  de.dataset.shape = ls('cv.shape', 'round'); de.dataset.shadow = ls('cv.shadow', '0');
 })();
 </script>
 <style>
@@ -62,7 +62,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cu
 input,select{font:inherit;color:inherit}
 svg{display:block;flex:none}
 #view{position:fixed;inset:0;display:block;touch-action:none}
-.plate{position:absolute;background:var(--plate);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--line);box-shadow:var(--plate-sh)}
+.plate{position:absolute;background:var(--plate);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--line);box-shadow:var(--plate-sh)} #obar,#rail{box-shadow:var(--hy-sh-row)}   /* the tools' rail (the dock) and the hint plate under the row: flat with «Тени: только панели» (Hyimg ui/tokens.css) */
 .kc,kbd{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;margin:0;
   font:600 11px/1 var(--sans);color:var(--sub);background:var(--raise);
   border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;flex:none}
@@ -120,20 +120,25 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 .hy-chev{display:block;width:12px;height:12px;flex:none;color:var(--muted);transition:transform .25s var(--ease)}
 
 /* ---- right column ---- */
-#side{right:12px;transition:opacity .25s var(--ease),transform .32s var(--ease);top:58px;bottom:12px;width:var(--colw);border-radius:var(--r-panel);background:var(--popbg);-webkit-backdrop-filter:none;backdrop-filter:none;display:flex;flex-direction:column;overflow:hidden;padding:0}
-#pbody{overflow-y:auto;flex:1;min-height:0;padding:0 0 8px;scrollbar-width:none}
+/* the right column is two blocks 8 px apart, round 12 «A · Line» (owner 2026-10-09, r12/image-effects.html and image-raw.html: «реализуй
+   этот дизайн»): each .pg a block of the app (ui/hy/block.css .hy-blk, its header .hy-bh), the gap between them the divider (#split,
+   .hy-split-gap); the column has no plate of its own. Its controls are dark wells, a value wears the Studio's purple (--frame) */
+#side{position:absolute;right:12px;transition:opacity .25s var(--ease),transform .32s var(--ease);top:58px;bottom:12px;width:var(--colw);display:flex;flex-direction:column;padding:0;overflow:visible;
+  border:0;border-radius:0;background:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;--r-ctl:var(--hy-ctl-r);--r-in:4px;--sel:var(--frame);--hy-sel:var(--frame);
+  --hy-acc:var(--frame);--hy-val:color-mix(in srgb,var(--frame) 30%,transparent);--hy-val-drag:color-mix(in srgb,var(--frame) 44%,transparent);
+  --hy-val-on:color-mix(in srgb,var(--frame) 30%,var(--hy-well));--hy-val-ink:color-mix(in srgb,var(--frame) 14%,var(--ink))}
+#pbody{overflow-y:auto;flex:1;min-height:0;padding:0 6px 6px;scrollbar-width:none}
 #pbody::-webkit-scrollbar{display:none}
-.sec{border-top:1px solid var(--line)}
-.sh{display:flex;align-items:center;gap:7px;width:100%;height:34px;padding:0 12px;color:var(--sub);font:500 11px var(--sans);letter-spacing:.06em;text-transform:uppercase}
+/* a section: the app's (.hy-sec, .hy-sh); its chevron in the head's 16 px box */
+.sh{width:100%;cursor:pointer;transition:color .18s var(--ease)}
 .sh:hover{color:var(--ink)}
-.sh .hy-chev{transform:rotate(90deg)}
+.sh .hy-chev{width:11px;height:11px;margin:0 2.5px;transform:rotate(90deg);transition:transform .25s var(--ease)}
 .sec.shut .sh .hy-chev{transform:none}
-.sh .sx{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;color:var(--muted)}
 .sb{display:grid;grid-template-rows:1fr;transition:grid-template-rows .32s var(--ease)}
 .sec.shut .sb{grid-template-rows:0fr}
 .sb>div{min-height:0;overflow:hidden}
-.sbi{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+.sbi{padding:2px 10px 8px;display:flex;flex-direction:column;gap:var(--hy-gap-ctl)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--hy-gap-ctl)}
 .nf{display:flex;align-items:center;height:28px;border-radius:var(--r-ctl);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line);padding:0 10px;gap:6px;transition:box-shadow .2s var(--ease)}
 .nf:focus-within{box-shadow:inset 0 0 0 1px var(--sel)}
 .nf .nl{color:var(--muted);cursor:ew-resize;font-size:12px;flex:none}
@@ -170,6 +175,26 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 .bgsw.tr{background:conic-gradient(var(--raise2) 25%,var(--raise) 0 50%,var(--raise2) 0 75%,var(--raise) 0) 0 0/10px 10px}
 .lockr{width:28px;height:28px;flex:none;border-radius:var(--r-ctl);display:grid;place-items:center;color:var(--sub);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line);transition:color .2s,background .2s}
 .lockr.on{color:var(--panel);background:var(--ink)}
+/* the right column's controls (r11.css «controls inside panels», r12/image-effects.html): wells 24 px with the column's 6 px corners
+   (--r-ctl), no hairline; a button lies on the block a hair lighter; what is chosen or on wears the Studio's purple (--hy-val-on) */
+#side :is(.nf,.selb,.mini){height:var(--hy-ctl-h);background:var(--hy-well);box-shadow:none;padding:0 8px;font-size:12px}
+#side :is(.nf,.selb,.mini):hover{background:var(--hy-well-hov)}
+#side .nf:focus-within{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sel) 65%,transparent)}
+#side :is(.nf,.mini) input{font-size:12px}
+#side .btn{height:var(--hy-ctl-h);background:var(--hy-wbtn);box-shadow:none;padding:0 9px;font-size:12px}
+#side .btn:hover{background:var(--hy-wbtn-hov)}
+#side .btn.on{background:var(--hy-val-on);color:var(--hy-val-ink);box-shadow:none}
+#side .btn.on svg{color:var(--hy-val-ink)}
+#side .whr{gap:var(--hy-gap-ctl)}
+#side .whr .btn{width:var(--hy-ctl-h)}
+#side .seg{border-radius:var(--hy-well-r);background:var(--hy-well)}
+#side .seg .st{border-radius:var(--hy-well-in-r);background:var(--hy-val-on);box-shadow:none}
+#side .seg button{border-radius:var(--hy-well-in-r)}
+#side .seg button.on{color:var(--hy-val-ink)}
+#side :is(.bgsw,.lockr){width:var(--hy-ctl-h);height:var(--hy-ctl-h)}
+#side .lockr{background:var(--hy-wbtn);box-shadow:none}
+#side .lockr.on,#side .xlk.on{background:var(--hy-val-on);color:var(--hy-val-ink);box-shadow:none}
+#side .xlk{height:var(--hy-ctl-h);min-width:var(--hy-ctl-h)}
 
 /* #split is the app's one splitter (ui/split.js .hy-split: the hairline, the grip, .off) */
 .tab .ti{display:grid}
@@ -177,28 +202,21 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 .tabs.tight .tab:not(.on) .tl{max-width:0;opacity:0}
 .tabs{overflow:hidden}
 .tab.hide{display:none}
-.tab{padding:0 8px !important}
 #side.gone{opacity:0;transform:translateX(14px);pointer-events:none}
-.pg{display:flex;flex-direction:column;min-height:0;overflow:hidden;flex:none;transition:height .38s var(--ease)}
+.pg{display:flex;flex-direction:column;min-height:0;overflow:hidden;flex:none;box-shadow:var(--plate-sh);transition:height .38s var(--ease)}   /* a block (.hy-blk), its depth by «Тени» */
 .pg.fill{flex:1 1 auto}
 .pg.closed{display:none}
 #side.drag .pg{transition:none}
 #side.drag.snap .pg{transition:height .38s var(--ease)}   /* a fold while the line is dragged eases (owner 2026-10-04: nothing jumps) */
-.tabs{display:flex;align-items:center;gap:2px;height:38px;padding:0 6px;flex:none;border-bottom:1px solid transparent;transition:border-color .25s var(--ease)}
-.pg:not(.shut) .tabs{border-bottom-color:var(--line)}
 .tabs .sp{flex:1}
-.tab{height:26px;padding:0 10px;border-radius:var(--r-ctl);color:var(--muted);font-size:12.5px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
-  transition:background .18s var(--ease),color .18s var(--ease),box-shadow .18s var(--ease)}
-.tab:hover{color:var(--sub);background:var(--hover)}
-.tab.on{color:var(--ink);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line)}
-.tab .tc{color:var(--muted);font-variant-numeric:tabular-nums}
-.tabs .gm{width:26px;height:26px}
+#split{height:var(--hy-gap-blk)}   /* the gap between the two blocks is the divider: the accent line under the pointer (ui/split.js .hy-split-gap) */
+.tab .tc{font:400 11.5px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums}   /* the tabs are the block header's (.hy-bh-tab) */
 .pgb{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
 .pane{display:none;flex-direction:column;flex:1;min-height:0}
 .pane.on{display:flex;animation:paneIn .28s var(--ease)}
 @keyframes paneIn{from{opacity:0;transform:translateY(4px)}}
-#pbody{overflow-y:auto;flex:1;min-height:0;padding:0 0 8px;scrollbar-width:none}
-#padj,#phist,#pchan{overflow-y:auto;scrollbar-width:none;padding:10px}
+#padj,#phist,#pchan{overflow-y:auto;scrollbar-width:none;padding:2px 6px 6px}
+#padj{padding:4px 10px 8px} #padj>.cgbox{margin:-4px -10px 0}   /* the Raw Editor's panel takes the block's width, its own rows inset (colorgrade.js) */
 .adjg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .adjt{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px 10px;border-radius:var(--r-box);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line);color:var(--sub);font-size:12px;
   transition:background .18s var(--ease),color .18s var(--ease),transform .18s var(--ease)}
@@ -223,15 +241,16 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 
 .lh{display:flex;align-items:center;gap:8px;padding:2px 12px 8px}
 .lh b{font-weight:600}
-.lset{padding:0 10px 8px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line)}
-.lset .row{gap:6px}
+.lset{padding:2px 10px 6px;display:flex;flex-direction:column;gap:var(--hy-gap-ctl)}
+.lset .row{gap:var(--hy-gap-ctl)}
 .lset .selb{flex:1}
 .mini{display:flex;align-items:center;gap:4px;height:28px;border-radius:var(--r-ctl);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line);padding:0 9px;flex:none;min-width:118px}   /* as wide as its word needs: «Прозрачность» in Russian */
 .mini .nl{color:var(--muted);font-size:12px;cursor:ew-resize}
 .mini input{width:27px;background:transparent;border:0;outline:0;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px}
 .mini .nu{color:var(--muted);font-size:12px}
 .lset.off .selb,.lset.off .mini{opacity:.4;pointer-events:none}
-#list{position:relative;flex:1;overflow-y:auto;padding:6px;scrollbar-width:none;min-height:0}
+#list{position:relative;flex:1;overflow-y:auto;padding:0 6px 6px;scrollbar-width:none;min-height:0}
+#rows .lr:not(:last-child){margin-bottom:var(--hy-gap-row)}   /* rows 2 px apart: a chosen row never meets its neighbour (r11/image-spacing) */
 #list::-webkit-scrollbar{display:none}
 .lr{position:relative;display:flex;align-items:center;gap:6px;height:38px;padding:0 6px 0 4px;border-radius:var(--r-row);color:var(--ink);transition:background .18s var(--ease),box-shadow .18s var(--ease),opacity .2s}
 .lr:hover{background:var(--raise)}
@@ -297,8 +316,8 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 #cliph{position:absolute;left:30px;right:10px;height:0;border-top:1.5px dashed var(--sel);opacity:0;pointer-events:none;transition:opacity .15s;z-index:3}
 #cliph.on{opacity:1}
 #cliph span{position:absolute;left:-22px;top:-9px;width:18px;height:18px;border-radius:5px;background:var(--sel);color:#fff;display:grid;place-items:center}
-.lbot{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-top:1px solid var(--line)}
-.lbot .ib{width:30px;height:30px}
+.lbot{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;border-top:1px solid var(--hy-pline)}
+.lbot .ib{width:28px;height:28px}
 
 /* ---- dock: the board's own (canvas.html .bar); on the board the editor uses the board's dock itself (imgframe.js) ---- */
 #dock{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:6px;border:1px solid var(--line);border-radius:var(--r-bar);
@@ -446,12 +465,7 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 #crumb.c1:hover .cxs,#crumb.c1:hover #cPage+.cs{max-width:16px;opacity:1;padding:0 1px}
 #crumb.c2 #cFrameName{max-width:110px}
 body.nt #crumb,body.nt #crumb *{transition:none!important}
-#topr{position:fixed;top:12px;right:58px;z-index:30;display:flex;align-items:center;gap:8px}   /* the gear after it and Cancel before Save the row's gap apart (ui/look.css --hy-row-gap) */
-.tp,.tq{height:38px;border-radius:var(--r-plate);display:inline-flex;align-items:center;gap:8px;padding:0 16px;font:500 13px var(--sans);white-space:nowrap;transition:background .18s var(--ease),color .18s var(--ease),opacity .18s var(--ease),transform .18s var(--ease)}
-.tp{background:var(--ink);color:var(--panel);border:1px solid var(--ink);box-shadow:var(--plate-sh)}
-.tp:hover{opacity:.88}.tp:active,.tq:active{transform:scale(.97)}
-.tq{color:var(--sub);padding:0 12px}
-.tq:hover{background:var(--plate);color:var(--ink)}
+/* Cancel and Save top right: Hyimg's <hy-studio-actions> (ui/hy/actions.css), the gear after them the row's gap apart */
 #bset{position:fixed;top:12px;right:12px;z-index:30;width:38px;height:38px;border-radius:var(--r-plate);display:grid;place-items:center;border:1px solid var(--line);color:var(--sub);background:var(--plate);
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);transition:color .2s var(--ease)}
 #bset:hover,#bset[aria-expanded=true]{color:var(--ink)}
@@ -585,11 +599,23 @@ body.nokeys #tip .kc{display:none}
 :root.board body.out #view{opacity:0}
 :root.board body:not(.in) :is(#rail,#side,#obar,#topr,#bset){pointer-events:none}
 :root{--frame:#8b5cf6}
+/* inside the Studio every chosen, checked or primary thing wears the Studio's purple (owner 2026-10-09 on a blue «Anti-alias» box and a
+   white Save: «вот здесь цвета неверные, вроде же бы в цвет режима должно быть?»); blue is the board's selection. :not(#_) outranks
+   the theme's :root[data-theme] of ui/tokens.css */
+:root:not(#_){--sel:var(--frame);--hy-sel:var(--frame)}
+.tp{background:var(--frame);border-color:var(--frame);color:var(--hy-on-accent,#fff)}
+:root[data-theme=light]{--frame:#7c3aed}   /* the board's light purple (imgframe.js), so the studio and its dock are one colour */
+/* the studio's own on, chosen and primary controls too, white marks on the purple (owner 2026-10-09 on the white Discard of «Close without
+   saving?»: «почему здесь кнопка до сих пор белая? Она должна быть такого цвета, в каком режиме мы сейчас находимся»): a dialog's action,
+   OK and Go on the options strip, Generate, a pressed toggle or tab, the chosen anchor and pivot, the render's progress. Cancel and the
+   other secondary buttons stay as they are */
+:is(#dlg .ok,.oib.ok,.mbt.go,.gbtn,.btn.on,.lockr.on,.db.on,.oib.on,.mbt.on,#actsTabs button.on,#bActs[aria-pressed=true]):is(*,:hover){
+  background:var(--sel);color:var(--hy-on-accent,#fff);box-shadow:none}
+:is(.gbtn,.btn.on) svg{color:inherit}
+:is(.anch button.on,.pivg button.on,#rcard .bar i):is(*,:hover){background:var(--sel)}
 #lwait{padding:14px 12px;color:var(--muted);font-size:12px}
-/* three labelled tabs fit in the column at every width */
-:root{--colw:316px}
-.tabs{gap:1px;padding:0 2px}
-.tab{padding:0 8px !important;gap:4px;font-size:12px}   /* 8 px: a capsule's words never closer to its round ends (owner 2026-10-06, design/contract.json inset.capsule) */
+/* three labelled tabs fit in the column at every width: round 12's header (12.5 px words, 14 px icons) beside the block's menu */
+:root{--colw:328px}
 /* ui/look.css gives every .btn of the app the corner of a 38 px plate in «pro» (11 px); the editor's .btn is a 28 px control inside a
    plate, which look.css gives 8 px: the same rule, said for these */
 :root[data-shape] :is(#side,#dlg,#rcard,#sets) .btn{border-radius:var(--r-ctl)!important}
@@ -604,7 +630,7 @@ body.nokeys #tip .kc{display:none}
 <div id="wl" aria-hidden="true"><i></i><i></i><i></i></div>
 <button id="tlibR" aria-pressed="false"><svg data-ic="library" class="lbi" width="18" height="18" stroke-width="1.8"></svg></button>
 <nav id="crumb"></nav>
-<div id="topr"><button id="bCancel" class="tq"></button><button id="bSave" class="tp"></button></div>
+<hy-studio-actions id="topr" tips="data"></hy-studio-actions>
 <button id="bset" aria-expanded="false"></button>
 <div id="sets" role="dialog"></div>
 
@@ -612,9 +638,9 @@ body.nokeys #tip .kc{display:none}
 <div id="rail" class="plate"><div class="hl"></div></div>
 <aside id="libp"><div class="lhd"><b></b><span class="note"></span></div><div id="libg"></div></aside>
 
-<aside id="side" class="plate">
-  <section class="pg" id="g1" data-g="g1">
-    <div class="tabs"><button class="tab" data-t="props"></button><button class="tab" data-t="adj"></button><button class="tab" data-t="hist"></button><button class="tab" data-t="gen"></button><span class="sp"></span><button class="ib gm"></button></div>
+<aside id="side">
+  <section class="pg hy-blk" id="g1" data-g="g1">
+    <div class="tabs hy-bh"><button class="tab hy-bh-tab" data-t="props"></button><button class="tab hy-bh-tab" data-t="adj"></button><button class="tab hy-bh-tab" data-t="hist"></button><button class="tab hy-bh-tab" data-t="gen"></button><span class="sp"></span><button class="gm hy-bh-btn"></button></div>
     <div class="pgb">
       <div class="pane" data-p="props" id="props"><div id="pbody"></div></div>
       <div class="pane" data-p="adj" id="padj"></div>
@@ -622,9 +648,9 @@ body.nokeys #tip .kc{display:none}
       <div class="pane" data-p="gen" id="pgen"></div>
     </div>
   </section>
-  <div id="split" data-side="left"></div>
-  <section class="pg" id="g2" data-g="g2">
-    <div class="tabs"><button class="tab" data-t="layers"></button><button class="tab" data-t="chan"></button><span class="sp"></span><button class="ib gm"></button></div>
+  <div id="split" class="hy-split-gap" data-side="left"></div>
+  <section class="pg hy-blk" id="g2" data-g="g2">
+    <div class="tabs hy-bh"><button class="tab hy-bh-tab" data-t="layers"></button><button class="tab hy-bh-tab" data-t="chan"></button><span class="sp"></span><button class="gm hy-bh-btn"></button></div>
     <div class="pgb">
       <div class="pane" data-p="layers" id="layers">
         <div class="lset" id="lset"><div class="row r1"></div></div>
@@ -679,7 +705,7 @@ const DOCMAX = 8000;
 const NB = 0, BATCH = false;
 // Every word of the interface, in English with Photoshop's own names. The Actions search also matches the Russian words in SYN.
 const T = hyEdTr({   // in the board's language (i18n.js, the words in lang.js)
-  title: 'Frame editor',
+  title: 'Image Studio',
   // batch editing, originals, history blocks (round 9)
   zoomFrame: 'Double-click to zoom to this frame', framesN: n => `Frames · ${n}`, nFrames: n => `${n} frames`, openBatch: n => `Open Selection as Batch (${n} frames)`, openSingle: 'Open a Single Frame',
   includeTip: 'Shared adjustments apply to this frame; click to exclude it', frameSec: 'Frame', frameIncluded: 'The shared adjustments above the frames apply to this frame.',
@@ -771,7 +797,7 @@ const T = hyEdTr({   // in the board's language (i18n.js, the words in lang.js)
   pickOneForMask: 'Select one picture or adjustment layer', maskNew: 'New mask: paint with black to conceal', maskPaint: 'Painting on the mask: black conceals, white reveals',
   maskApplied: 'Mask applied', maskReverted: 'Mask restored', xfCancelled: 'Transform cancelled', xfApplied: 'Transform applied',
   // messages
-  needsApp: 'This works when the editor is open in Hyimg', fragment: ' piece', posLocked: 'The layer position is locked', pickLayer: 'Select a layer', pickOne: 'Select one layer',
+  needsApp: 'This works when Image Studio is open in Hyimg', fragment: ' piece', posLocked: 'The layer position is locked', pickLayer: 'Select a layer', pickOne: 'Select one layer',
   nothingUndo: 'Nothing to undo', undone: 'Undo ', nothingRedo: 'Nothing to redo', redone: 'Redo ', brushNeeds: 'The brush paints on a picture layer or a mask', layerHidden: 'The layer is hidden', pxLocked: 'The layer pixels are locked',
   layerN: 'Layer ', groupN: 'Group ', copySuffix: ' copy', noLayersSel: 'No layers selected', duplicatedN: n => `${n} layers duplicated`, duplicated: 'Layer duplicated',
   mergedN: n => `${n} layers merged`, nothingBelow: 'There is no layer below', mergedDown: 'Merged down', mergedName: 'Merged', mergedVisible: 'Visible layers merged',
@@ -1143,11 +1169,11 @@ let dpr = 1;
 const V = { x: 0, y: 0, s: .2 }, Z = { x: 0, y: 0, s: .2 };   // the view and where it is easing to
 const RUL = () => S.rulers ? 18 : 0;   // the rulers as drawn and grabbed (guides are pulled from them)
 const RSP = 18;   // the room the layout keeps for them, shown or not
-// the vertical ruler runs down the left edge from under the options bar (TOPY), not under the top line: the line's plates and the options
-// bar keep the window's gutter and never cross the ruler's edge (owner 2026-10-07: «breadcrumb area тоже разношерстная», the library button
-// and the hint looked cut off by the window's edge); a guide is pulled from where the ruler is
-const inVR = (x, y) => x < RUL() && y >= TOPY;
-// the rulers are the window's edge for the design audit (Hyimg design/audit.js top-row): the top line and the hint never lie on them
+// the vertical ruler runs down the left edge from the window's very top (owner 2026-10-09: «опять проблема с тем, что до самого верху
+// должна идти линейка»; 59c21fd had started it under the options bar), the top line's plates float over it; a guide is pulled from all of it
+const inVR = (x, y) => x < RUL() && y >= 0;
+// the rulers are the window's edge for the design audit (Hyimg design/audit.js top-row): the hint and the options never lie on them; the
+// row's own plates (library, crumb) float over the ruler's top, so the band starts under the row (TOPY)
 window.hyEdges = () => RUL() ? [{ left: 0, top: Math.min(TOPY, innerHeight - RUL()), right: RUL(), bottom: innerHeight - RUL() },
   { left: 0, top: innerHeight - RUL(), right: innerWidth, bottom: innerHeight }] : [];
 // where the tool rail stands: past the vertical ruler, or past an open library that floats over the window's left part (the rulers stay
@@ -1177,10 +1203,8 @@ function resize() {
   view.style.width = innerWidth + 'px'; view.style.height = innerHeight + 'px';
   acc.width = view.width; acc.height = view.height; S.dirty = true;
 }
-let checker, dots, antsPat, thumbChk;
+let dots, antsPat, thumbChk;
 function patterns() {
-  const c = mk(32, 32), x = c.getContext('2d'); x.fillStyle = '#e4e4e7'; x.fillRect(0, 0, 32, 32); x.fillStyle = '#c4c4ca'; x.fillRect(0, 0, 16, 16); x.fillRect(16, 16, 16, 16);
-  checker = vctx.createPattern(c, 'repeat');
   const d = mk(24, 24), y = d.getContext('2d'); y.fillStyle = 'rgba(255,255,255,.055)'; y.beginPath(); y.arc(12, 12, .9, 0, 7); y.fill();
   dots = vctx.createPattern(d, 'repeat');
   const a = mk(8, 8), z = a.getContext('2d'); z.fillStyle = '#000'; z.fillRect(0, 0, 8, 8); z.strokeStyle = '#fff'; z.lineWidth = 2.8;
@@ -1199,13 +1223,11 @@ function renderView() {
   if (PREVIEW && !S.ready) { a.imageSmoothingQuality = 'high'; a.drawImage(PREVIEW, 0, 0, W, H); a.restore(); return; }
   if (BATCH) { /* each artboard paints its own background */ }
   else if (BG) { a.fillStyle = BG; a.fillRect(0, 0, W, H); }
-  // transparent: the checkerboard, on the board too (owner 2026-10-07: «бг прозрачный не включается», the board's paper showed through
-  // and read as white); what the master mask hides still shows the board
-  else { a.setTransform(1, 0, 0, 1, 0, 0); checker.setTransform(new DOMMatrix().scale(dpr * .5)); a.fillStyle = checker; a.fillRect(0, 0, acc.width, acc.height); }
+  // transparent: nothing, as Figma (owner 2026-10-09: «а почему шахматка, когда мы можем полностью прозрачный просто сделать, а шахматку
+  // просто в кружке вверху показывать»): what lies behind the document shows, the board or the studio's paper; the checkerboard is only
+  // in the Background swatch (.bgsw.tr) and the layers' thumbnails. What the master mask hides shows the same
   a.setTransform(1, 0, 0, 1, 0, 0);
   renderList(VR, a, root, M, 0);
-  // what the master mask hides is transparent: the checkerboard under it (on the board the board itself shows through)
-  const mm = mmNode(); if (!BM && mm && mm.visible && mm.mask && mm.mask.on !== false) { a.globalCompositeOperation = 'destination-over'; checker.setTransform(new DOMMatrix().scale(dpr * .5)); a.fillStyle = checker; a.fillRect(0, 0, acc.width, acc.height); a.globalCompositeOperation = 'source-over'; }
   a.restore();
 }
 let lastT = performance.now(), antsT = 0, lastThumb = 0, shownZ = '';
@@ -1240,14 +1262,19 @@ function draw() {
     c.fillStyle = PAPER; c.fillRect(0, 0, innerWidth, innerHeight);
     dots.setTransform(new DOMMatrix().translate(((V.x % 24) + 24) % 24, ((V.y % 24) + 24) % 24));
     c.fillStyle = dots; c.fillRect(0, 0, innerWidth, innerHeight);
-    c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 46 * dpr; c.shadowOffsetY = 18 * dpr; c.fillStyle = '#0c0c0e'; boards.forEach(b => c.fillRect(V.x + b.x * V.s, V.y + b.y * V.s, b.w * V.s, b.h * V.s)); c.restore();
+    // the shadow only around the document, never under it: a transparent document shows the paper, as the board's lift (ui/editlift.js)
+    c.save(); c.beginPath(); c.rect(0, 0, innerWidth, innerHeight); boards.forEach(b => c.rect(V.x + b.x * V.s, V.y + b.y * V.s, b.w * V.s, b.h * V.s)); c.clip('evenodd');
+    c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 46 * dpr; c.shadowOffsetY = 18 * dpr; c.fillStyle = '#0c0c0e';
+    boards.forEach(b => c.fillRect(V.x + b.x * V.s, V.y + b.y * V.s, b.w * V.s, b.h * V.s)); c.restore();
   }
   c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(acc, 0, 0); c.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (S.film) drawFilm(c);
   drawPatch(c);
-  // the document's edge; on the board it is the frame's purple (owner 2026-10-05: frames are purple), coming in with the rest
-  c.save(); if (BM) { c.globalAlpha = ENT.v; c.strokeStyle = FRAMEC; } else c.strokeStyle = 'rgba(255,255,255,.07)';
-  c.lineWidth = 1; boards.forEach(b => c.strokeRect(Math.round(V.x + b.x * V.s) - .5, Math.round(V.y + b.y * V.s) - .5, Math.round(b.w * V.s) + 1, Math.round(b.h * V.s) + 1)); c.restore();
+  // the document's edge, a hairline just outside it in the panels' --line: always on its own paper; on the board (owner 2026-10-08: «выделение
+  // вокруг очень мешает видеть, что на гранях», Hyimg lifts the frame with a shadow there) only while the board shows through the document,
+  // so where the frame ends is still seen (owner 2026-10-09, no checkerboard on a transparent one); it comes in with the rulers
+  if (!BM || seeThrough()) { c.save(); c.strokeStyle = (UI && UI.line) || 'rgba(255,255,255,.07)'; if (BM) c.globalAlpha = ENT.v;
+  c.lineWidth = 1; boards.forEach(b => c.strokeRect(Math.round(V.x + b.x * V.s) - .5, Math.round(V.y + b.y * V.s) - .5, Math.round(b.w * V.s) + 1, Math.round(b.h * V.s) + 1)); c.restore(); }
   drawBoards(c);
   if (S.grid) { c.save(); c.beginPath(); const st = W / 12; for (let gx = st; gx < W; gx += st) { c.moveTo(V.x + gx * V.s, V.y); c.lineTo(V.x + gx * V.s, V.y + h); } for (let gy = st; gy < H; gy += st) { c.moveTo(V.x, V.y + gy * V.s); c.lineTo(V.x + w, V.y + gy * V.s); } c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = .7; c.stroke(); c.restore(); }
   if (S.extras) drawGuides(c);
@@ -1260,6 +1287,8 @@ function draw() {
   drawGuideTag(c);
   drawCursor(c);
 }
+// what lies behind the document shows through it: no background, or the master mask hides a part
+const seeThrough = () => { if (!BG) return true; const mm = mmNode(); return !!(mm && mm.visible && mm.mask && mm.mask.on !== false); };
 const hl = v => Math.round(v - .5) + .5;
 const toS = pt => ({ x: V.x + pt.x * V.s, y: V.y + pt.y * V.s });
 function polyHair(c, pts, color, crisp) {
@@ -1293,7 +1322,9 @@ function boxCursor(hit) {
   return ang < 22.5 || ang >= 157.5 ? 'ew-resize' : ang < 67.5 ? 'nwse-resize' : ang < 112.5 ? 'ns-resize' : 'nesw-resize';
 }
 function drawBoxes(c) {
-  if (!S.xf && S.extras) selNodes().forEach(n => pixelsIn(n).forEach(p => polyHair(c, corners(p).map(toS), 'rgba(59,130,246,.75)', true)));
+  // the picked layers' pixels: a hairline of the studio's colour (UI.sel, the purple), no longer the board's blue (owner 2026-10-09)
+  if (!S.xf && S.extras) {
+    c.save(); c.globalAlpha = .75; selNodes().forEach(n => pixelsIn(n).forEach(p => polyHair(c, corners(p).map(toS), UI.sel, true))); c.restore(); }
   const b = curBox(); if (!b) return;
   const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => toS(boxPt(b, u, v)));
   if (S.extras) polyHair(c, pts, UI.sel, true);
@@ -1323,14 +1354,14 @@ function drawHoverRow(c) {
 
 /* ---- rulers and guides ---- */
 function rulerStep() { const st = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]; const major = st.find(x => x * V.s >= 64) || 20000; const minor = major / (major * V.s >= 130 ? 10 : 5); return { major, minor }; }
-// the rulers frame the canvas: the vertical one down the left edge under the options bar (from TOPY, inVR), the horizontal one along the
-// bottom (owner 2026-10-05), the corner square bottom left; the dock floats just above the bottom ruler
+// the rulers frame the canvas: the vertical one down the left edge from the window's top (inVR), the horizontal one along the bottom
+// (owner 2026-10-05), the corner square bottom left where they meet; the dock floats just above the bottom ruler
 function drawRulers(c) {
-  if (!S.rulers) return; const R = 18, B = innerHeight - R, xe = innerWidth, T0 = Math.min(TOPY, B);
+  if (!S.rulers) return; const R = 18, B = innerHeight - R, xe = innerWidth, T0 = 0;
   const { major, minor } = rulerStep();
   c.save();
   c.globalAlpha = .95; c.fillStyle = UI.panel; c.fillRect(0, B, xe, R); c.fillRect(0, T0, R, B - T0); c.globalAlpha = 1;
-  c.fillStyle = UI.line; c.fillRect(0, B, xe, 1); c.fillRect(R - 1, T0, 1, B - T0); c.fillRect(0, T0, R, 1);
+  c.fillStyle = UI.line; c.fillRect(0, B, xe, 1); c.fillRect(R - 1, T0, 1, B - T0);
   // the document's extent, tinted
   c.globalAlpha = .045; c.fillStyle = UI.ink; c.fillRect(Math.max(R, V.x), B + 1, Math.max(0, Math.min(xe, V.x + W * V.s) - Math.max(R, V.x)), R - 1); c.fillRect(0, Math.max(T0, V.y), R - 1, Math.max(0, Math.min(B, V.y + H * V.s) - Math.max(T0, V.y))); c.globalAlpha = 1;
   c.font = '500 9.5px Geist, ui-sans-serif, sans-serif';
@@ -1687,6 +1718,7 @@ function deepCopy(n, rename) {
   const m = cloneNode(n); m.id = nid(n.type[0]); if (rename) m.name = n.name + T.copySuffix;
   if (n.c) m.c = copyC(n.c); if (n.mask) m.mask = { ...n.mask, c: copyC(n.mask.c) };
   if (m.orig) { m.orig = false; m.locks.pixels = false; delete m.src; }   // a copy is an ordinary layer, its pixels are the frame's own
+  if (m.base) { delete m.base; setLock(m, false); }   // a copy of the base layer is a normal one (basework.js)
   if (n.children) m.children = n.children.map(c => deepCopy(c, false)); return m;
 }
 function duplicate() {
@@ -1696,6 +1728,7 @@ function duplicate() {
 }
 function deleteSel() {
   const sel = topSel(); if (!sel.length || structSel()) return;
+  if (K.baseStop(sel)) return;
   if (sel.some(n => n.orig || (n.children && pixelsIn(n).some(p => p.orig)))) return toast(T.origNoDelete, 'lock');
   edit(T.h.delete, () => { const l = locate(sel[0].id); removeNodes(sel); const nb = l.list[Math.max(0, l.i - 1)] || l.list[0] || allPixels().pop(); S.ids = nb ? [nb.id] : []; S.editMask = false; });
 }
@@ -1712,12 +1745,14 @@ function compositeNodes(nodes, name) {
 function mergeDown() {
   const sel = topSel(); if (structSel()) return;
   if (sel.length > 1) {
+    if (K.baseStop(sel)) return;
     const ord = stackOrder(sel);
     edit(T.h.mergeLayers, () => { const m = compositeNodes(ord, ord[ord.length - 1].name); const l = locate(ord[ord.length - 1].id); l.list.splice(l.i + 1, 0, m); ord.forEach(x => x.visible = false); S.ids = [m.id]; S.editMask = false; });
     return toast(T.mergedKept, 'merge');
   }
   const n = sel[0]; if (!n) return; const l = locate(n.id), below = l.list[l.i - 1];
   if (!below) return toast(T.nothingBelow, 'merge');
+  if (K.baseStop([below])) return;   // nothing merges into the base layer
   edit(T.h.mergeDown, () => { const m = compositeNodes([below, n], T.mergedName); l.list.splice(l.i + 1, 0, m); below.visible = false; n.visible = false; S.ids = [m.id]; S.editMask = false; });
   toast(T.mergedKept, 'merge');
 }
@@ -1741,7 +1776,7 @@ function toggleClip(n) {
 }
 function baseOf(n) { const l = locate(n.id); for (let i = l.i - 1; i >= 0; i--) if (!l.list[i].clip) return l.list[i]; return l.list[0]; }
 function groupSel() {
-  const sel = topSel(); if (!sel.length || structSel()) return; const ord = stackOrder(sel);
+  const sel = topSel(); if (!sel.length || structSel() || K.baseStop(sel)) return; const ord = stackOrder(sel);
   edit(T.h.group, () => { const ph = {}; const top = ord[ord.length - 1], l = locate(top.id); l.list.splice(l.i + 1, 0, ph); removeNodes(ord); const g = groupNode(T.groupN + (folderSeq++), ord.map(n => (n.clip = n.clip && ord.includes(baseOf(n)), n))); const pl = l.list; pl.splice(pl.indexOf(ph), 1, g); S.ids = [g.id]; });
   toast(T.grouped, 'group');
 }
@@ -2086,7 +2121,12 @@ function syncMenus() { if (actsOpen()) renderActs(); }
 function toggleExtras() { S.extras = !S.extras; S.odirty = true; S.mbKey = ''; toast(S.extras ? T.extrasOn : T.extrasOff, 'guideN'); }
 // the browser on macOS may take ⌘H to hide the app before the page sees it, so catch it early, and ⌃H works as a fallback
 addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.code === 'KeyH' && !(e.target.closest && e.target.closest('input, textarea'))) { e.preventDefault(); e.stopImmediatePropagation(); toggleExtras(); } }, true);
-function toggleRulers() { S.rulers = !S.rulers; document.body.classList.toggle('rul', S.rulers); S.odirty = true; }   // only drawn again: the layout keeps their room (RSP), nothing refits
+// the rulers are off until the person turns them on (owner 2026-10-09: «по дефолту выключена быть»), then this viewer keeps them (⌘R, View)
+const rulersKept = () => { try { return localStorage.getItem('hy-ed-rulers') === '1'; } catch (e) { return false; } };
+function toggleRulers() {
+  S.rulers = !S.rulers; document.body.classList.toggle('rul', S.rulers); S.odirty = true;
+  try { localStorage.setItem('hy-ed-rulers', S.rulers ? '1' : '0'); } catch (e) {}
+}   // only drawn again: the layout keeps their room (RSP), nothing refits
 function newGuideDialog() {
   const v = { o: 'v', pos: Math.round(W / 2) };
   openDialog(T.newGuide, 'guideN', b => {
@@ -2134,14 +2174,14 @@ $('#cols .fg').addEventListener('click', () => { S.colTarget = 'fg'; colorIn.val
 $('#cols .bg').addEventListener('click', () => { S.colTarget = 'bg'; colorIn.value = S.bg; colorIn.click(); });
 $('#cols .swap').addEventListener('click', swapColors); $('#cols .rst').addEventListener('click', resetColors);
 colorIn.addEventListener('input', () => { if (S.colTarget === 'bgc') { const n = byId(S.bgcNode); if (n) { n.bgc = colorIn.value; S.dirty = true; } return; } if (S.colTarget === 'docbg') { BG = colorIn.value; S.dirty = true; renderProps(); return; } S[S.colTarget] = colorIn.value; updColors(); });
-function updColors() { $('#cols .fg').style.background = S.fg; $('#cols .bg').style.background = S.bg; S.odirty = true; }
+function updColors() { $('#cols .fg').style.background = S.fg; $('#cols .bg').style.background = S.bg; S.odirty = true; if (K.onColors) K.onColors(); }
 function swapColors() { [S.fg, S.bg] = [S.bg, S.fg]; updColors(); if (S.editMask && one() && one().mask) toast(lum(S.fg) < .5 ? T.blackHides : T.whiteReveals, 'mask'); }
 function resetColors() { S.fg = '#000000'; S.bg = '#ffffff'; updColors(); }
 function placeRailHl() { const b = rail.querySelector(`[data-g="${groupOf(S.tool).id}"]`); if (b) railHl.style.transform = `translateY(${b.offsetTop - 3}px)`; }
 function setTool(id) {
   if (S.stroke) return; S.tool = id; const g = groupOf(id); g.last = id; g.sync();
   rail.querySelectorAll('[data-g]').forEach(b => b.classList.toggle('on', b.dataset.g === g.id));
-  placeRailHl(); updCursor(); S.odirty = true; S.mbKey = '';
+  placeRailHl(); updCursor(); S.odirty = true; S.mbKey = ''; if (K.onTool) K.onTool(id);
 }
 
 /* ---- library: the round button at the top left slides the gallery in from the left, as on the board ---- */
@@ -2213,7 +2253,7 @@ function rowHTML(n, depth, ih, il) {   // ih, il: a group above it is hidden, lo
   const marks = (isPinned(n) ? `<span class="pin" data-tip="${n.mmask ? T.mainMaskTip : T.mainTip}" data-side="left">${hyIcon("master", 13, 2)}</span>` : '') + (n.link ? `<span class="lkd" data-tip="${T.linkedTip}" data-side="left">${svg('link', 13)}</span>` : '') + (n.gen ? `<span class="lkd" data-tip="${T.generativeLayer}" data-side="left">${svg('spark', 13)}</span>` : '');
   return `<div class="lr ${sel ? 'sel' : ''} ${n.visible ? '' : 'hid'} ${gh ? 'ghid' : ''} ${gl ? 'glock' : ''} ${S.enter === n.id ? 'enter' : ''} ${n.main ? 'main' : ''} ${n.mmask ? 'mmask' : ''} ${n.color ? 'hy-rc' : ''}" data-id="${n.id}"${n.color && window.hyRowColor ? ` style="--hy-rc:${hyRowColor(n.color)}"` : ''}>${ind}${lead}<span class="nm ${isB ? 'base' : ''}">${esc(n.frames ? T.framesN(n.children.length) : n.name)}</span>${marks}` +
     (n.frame ? `<button class="rb keep inc ${n.include === false ? 'off' : ''}" data-a="incl" data-tip="${T.includeTip}" data-side="left">${svg('adj', 14)}</button>` : '') +
-    (isPinned(n) ? '' : `<button class="rb ${locked || gl ? 'keep' : ''} ${gl ? 'inh' : ''}" data-a="lock" data-tip="${locked ? T.lockedTip : gl ? T.lockedByGroup : T.lockTip}" data-side="left">${LOCKI(locked || gl)}</button>`) +
+    (isPinned(n) ? '' : n.base ? K.baseLock() : `<button class="rb ${locked || gl ? 'keep' : ''} ${gl ? 'inh' : ''}" data-a="lock" data-tip="${locked ? T.lockedTip : gl ? T.lockedByGroup : T.lockTip}" data-side="left">${LOCKI(locked || gl)}</button>`) +
     `<button class="rb ${n.visible && !gh ? '' : 'keep'} ${gh ? 'inh' : ''}" data-a="eye" data-tip="${gh ? T.hiddenByGroup : T.showHide}" data-side="left">${svg(n.visible && !gh ? 'eye' : 'eyeoff', 15)}</button></div>`;
 }
 function listHTML(list, depth, ih, il) {
@@ -2253,7 +2293,9 @@ const LOCK_ALL = { alpha: true, pixels: true, pos: true, all: true };
 const lk = n => lockedByGroup(n) ? LOCK_ALL : n.locks;
 // why a layer's settings are grey (owner 2026-10-07: «и настройки серым цветом disabled для них»): null while they can change
 const blockedWhy = n => !n || isPinned(n) ? null : lockedByGroup(n) ? T.lockedByGroup : hidByGroup(n) ? T.hiddenByGroup : (n.locks.all || n.locks.pos) ? T.lockedSelf : null;
-function setLock(n, on) { n.locks = on ? { alpha: true, pixels: true, pos: true, all: true } : { alpha: false, pixels: !!n.orig, pos: false, all: false }; }
+function setLock(n, on) {
+  if (n.base) on = true;   // the base layer stays locked (basework.js)
+  n.locks = on ? { alpha: true, pixels: true, pos: true, all: true } : { alpha: false, pixels: !!n.orig, pos: false, all: false }; }
 // Photoshop's eye drag (ui/eyedrag.js, owner 2026-10-07): a press on a row's eye or lock switches it, every row the pointer passes while
 // held takes the same state, past the list's edge the list scrolls on; the whole drag is one step to undo
 if (window.hyEyeDrag) {
@@ -2272,13 +2314,25 @@ if (window.hyEyeDrag) {
       const ic = b.querySelector('.hy-lock'); if (ic) ic.classList.toggle('locked', on); else b.innerHTML = LOCKI(on); },   // in place: the shackle swings (look.css .hy-lock)
     end: n => { if (n) endEdit(); else S.pending = null; updHist(); clearTimeout(S.lockT); S.lockT = setTimeout(refresh, 300); } });   // the list redraws once the shackle has moved
 }
-// clicks, double clicks, drag to reorder, ⌥ between rows to clip
+// clicks, double clicks, drag to reorder, ⌥ between rows to clip. Photoshop's two ⌥ gestures, told apart (owner 2026-10-09: «при нажатии
+// Option и нажатии между layers образуется ... clipping mask; Option + зажатие layer и перетягивание = копировать выделенный layer»):
+// ⌥-click on the line between two rows clips the upper one to the lower one (the selection stays), ⌥ and a drag of a row, from anywhere on it
+// and with ⌥ held at the press or at the drop, leaves a copy where it drops. Over the line ⌥ shows the clip cursor, a ⌥-drag the copy one
 let rowDrag = null;
+const CLIPCUR = (() => {   // the clip icon (Hyimg ui/icons.js «clip»), white on a dark edge
+  const d = window.hyIconPath ? hyIconPath('clip') : ''; if (!d) return 'alias';
+  // hy-allow: icon-inline the registry's clip path, drawn twice for a cursor's dark edge
+  const g = (c, w) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const sv = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${g('#000', 4.5)}${g('#fff', 2)}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(sv)}") 5 4, alias`; })();
 $('#list').addEventListener('pointerdown', e => { if (e.target.id === 'list' || e.target.id === 'rows') { if (S.ids.length && !S.maskMode && !S.xf) { S.ids = []; S.editMask = false; refresh(); } } });
 rowsEl.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   const lr = e.target.closest('.lr'); const a = e.target.closest('[data-a]');
-  if (e.altKey) { const pair = clipPairAt(e.clientY); if (pair) { e.preventDefault(); toggleClip(pair.upper); return; } }
+  if (e.altKey) { const pair = clipPairAt(e.clientY); if (pair) { e.preventDefault(); e.stopPropagation();   // not #list's «press on nothing: deselect»
+    // on the line: a click clips; from a row there a drag copies it instead (decided on the move or the release)
+    if (!lr || isPinned(byId(lr.dataset.id))) { toggleClip(pair.upper); return; }
+    rowDrag = { id: lr.dataset.id, y: e.clientY, x: e.clientX, on: false, pid: e.pointerId, clip: pair.upper, alt: true }; return; } }
   if (!lr) { if (S.ids.length && !S.maskMode && !S.xf) { S.ids = []; S.editMask = false; refresh(); } return; }
   const id = lr.dataset.id, n = byId(id);
   if (a && a.dataset.a === 'incl') { edit(T.h.include, () => { n.include = n.include === false; }); return; }
@@ -2295,23 +2349,38 @@ rowsEl.addEventListener('pointerdown', e => {
   if (!n.mask) S.editMask = false;
   if (n.mmask) S.editMask = true;   // the master mask is only a mask: the brush paints on it
   refresh();
-  rowDrag = { id, y: e.clientY, x: e.clientX, on: false, pid: e.pointerId, pend: rowDrag && rowDrag.pend };
+  rowDrag = { id, y: e.clientY, x: e.clientX, on: false, pid: e.pointerId, pend: rowDrag && rowDrag.pend, alt: e.altKey };
 });
+let lastPt = null;
+// ⌥ over the line between two rows: the clip line and the clip cursor; on ⌥'s key too, where the pointer stands
+function altHover(alt, x, y, over) {
+  const pair = alt && over && !rowDrag ? clipPairAt(y) : null;
+  if (pair) { const r = listEl.getBoundingClientRect(); clipH.style.top = (pair.y - r.top + listEl.scrollTop) + 'px'; clipH.classList.add('on'); listEl.style.cursor = CLIPCUR; }
+  else if (clipH.classList.contains('on')) { clipH.classList.remove('on'); if (!rowDrag) listEl.style.cursor = ''; }
+}
+['keydown', 'keyup'].forEach(t => addEventListener(t, e => { if (e.key === 'Alt' && lastPt) altHover(e.type === 'keydown', lastPt.x, lastPt.y, lastPt.over); }));
 addEventListener('pointermove', e => {
-  if (e.altKey && listEl.contains(e.target) && !rowDrag) { const pair = clipPairAt(e.clientY); if (pair) { const r = listEl.getBoundingClientRect(); clipH.style.top = (pair.y - r.top + listEl.scrollTop) + 'px'; clipH.classList.add('on'); listEl.style.cursor = 'copy'; } else { clipH.classList.remove('on'); listEl.style.cursor = ''; } }
-  else if (clipH.classList.contains('on')) { clipH.classList.remove('on'); listEl.style.cursor = ''; }
+  lastPt = { x: e.clientX, y: e.clientY, over: listEl.contains(e.target) };
+  altHover(e.altKey, e.clientX, e.clientY, lastPt.over);
   if (!rowDrag) return;
-  if (!rowDrag.on && Math.abs(e.clientY - rowDrag.y) > 5) { rowDrag.on = true; S.ids.forEach(id => { const r = rowsEl.querySelector(`.lr[data-id="${id}"]`); if (r) r.classList.add('drag'); }); }
-  if (rowDrag.on) { rowDrag.target = dropTarget(e.clientY); showDropTarget(rowDrag.target); }
+  if (!rowDrag.on && Math.abs(e.clientY - rowDrag.y) > 5) {
+    if (rowDrag.clip) {   // pressed with ⌥ on the line and dragged: the row goes as a copy, chosen if it was not
+      const id = rowDrag.id; rowDrag.clip = null; if (!S.ids.includes(id)) { S.ids = [id]; S.anchor = id; S.editMask = false; refresh(); }
+    }
+    rowDrag.on = true; S.ids.forEach(id => { const r = rowsEl.querySelector(`.lr[data-id="${id}"]`); if (r) r.classList.add('drag'); });
+  }
+  if (rowDrag.on) { const cp = e.altKey || rowDrag.alt; rowDrag.target = dropTarget(e.clientY); showDropTarget(rowDrag.target, cp); listEl.style.cursor = cp ? 'copy' : ''; }
 });
 addEventListener('pointerup', e => {
   if (!rowDrag) return; const d = rowDrag; rowDrag = null; insEl.classList.remove('on'); rowsEl.querySelectorAll('.into').forEach(r => r.classList.remove('into'));
-  if (d.on && d.target) moveTo(d.target, e.altKey); else if (d.pend && !d.on) { S.ids = [d.pend]; S.anchor = d.pend; refresh(); } else renderLayers();
+  if (d.on) listEl.style.cursor = '';
+  if (d.clip && !d.on) { toggleClip(d.clip); return; }   // ⌥-click on the line
+  if (d.on && d.target) moveTo(d.target, e.altKey || d.alt); else if (d.pend && !d.on) { S.ids = [d.pend]; S.anchor = d.pend; refresh(); } else renderLayers();
 });
 function clipPairAt(y) {
   const vr = visibleRows();
   for (let i = 0; i < vr.length - 1; i++) {
-    const a = vr[i].getBoundingClientRect(); if (Math.abs(y - a.bottom) > 4) continue;   // the line between the rows, ± 4 px (Photoshop's)
+    const a = vr[i].getBoundingClientRect(); if (Math.abs(y - a.bottom) > 6) continue;   // the line between the rows, ± 6 px (a drag from there copies)
     const up = byId(vr[i].dataset.id), lo = byId(vr[i + 1].dataset.id); if (!up || !lo) continue;
     const lu = locate(up.id), ll = locate(lo.id); if (lu.list !== ll.list || lu.i !== ll.i + 1 || isPinned(up) || isPinned(lo)) continue;   // a Raw Editor layer clips too, a master never
     return { upper: up, lower: lo, y: a.bottom };
@@ -2329,15 +2398,16 @@ function dropTarget(y) {
   const last = vr[vr.length - 1], b = last.getBoundingClientRect(), first = vr[0].getBoundingClientRect();
   return y > b.bottom ? { ref: byId(last.dataset.id), pos: 'below', row: last, y: b.bottom } : { ref: byId(vr[0].dataset.id), pos: 'above', row: vr[0], y: first.top };
 }
-function showDropTarget(t) {
+function showDropTarget(t, copy) {
   rowsEl.querySelectorAll('.into').forEach(r => r.classList.remove('into'));
-  if (!t || !validDrop(t)) { insEl.classList.remove('on'); return; }
+  if (!t || !validDrop(t, copy)) { insEl.classList.remove('on'); return; }
   if (t.pos === 'into') { insEl.classList.remove('on'); t.row.classList.add('into'); return; }
   const lr = listEl.getBoundingClientRect(); insEl.style.top = (t.y - lr.top + listEl.scrollTop) + 'px'; insEl.classList.add('on');
 }
-function validDrop(t) {
+function validDrop(t, copy) {   // copy: a ⌥-drag leaves the layers where they are, the base layer too; the copies may land right by them
+  if (K.baseDrop(topSel(), t, copy)) return false;   // the base layer stays at the bottom (basework.js)
   if (topSel().some(isPinned) || (isPinned(t.ref) && !(isMM(t.ref) && t.pos === 'below'))) return false;   // the masters stay on top; under them is the top of the layers
-  const sel = topSel(); if (!t.ref || sel.includes(t.ref) || sel.some(s => isDesc(t.ref, s))) return false;
+  const sel = topSel(); if (!t.ref || (sel.includes(t.ref) && !(copy && t.pos !== 'into')) || sel.some(s => isDesc(t.ref, s))) return false;
   if (!BATCH) return true;
   if (sel.some(isStruct)) return sel.every(n => n.frame) && !!t.ref.frame && t.pos !== 'into';   // frames only reorder among frames
   if (t.ref.frames) return t.pos === 'above' && sel.every(n => n.type === 'adjust');
@@ -2345,8 +2415,8 @@ function validDrop(t) {
   if (!locate(t.ref.id).parent && t.pos !== 'into' && sel.some(n => n.type !== 'adjust')) return false;   // the top level holds only shared adjustments
   return true;
 }
-function moveTo(t, copy) {   // ⌥ held at the drop: copies go there, the layers stay (Photoshop)
-  if (!validDrop(t)) { renderLayers(); return; }
+function moveTo(t, copy) {   // ⌥ at the press or the drop: copies go there, the layers stay (Photoshop)
+  if (!validDrop(t, copy)) { renderLayers(); return; }
   let sel = stackOrder(topSel());
   edit(copy ? T.h.duplicate : T.h.order, () => {
     if (copy) { sel = sel.map(n => deepCopy(n, true)); S.ids = sel.map(n => n.id); } else removeNodes(sel);
@@ -2358,7 +2428,7 @@ rowsEl.addEventListener('pointerover', e => { const r = e.target.closest('.lr');
 rowsEl.addEventListener('pointerleave', () => { S.hoverRow = null; S.odirty = true; });
 rowsEl.addEventListener('dblclick', e => {
   const fz = e.target.closest('[data-a=frm]'); if (fz) { const f = byId(fz.closest('.lr').dataset.id); if (f) { zoomToRect(f.frame); if (!f.open) { f.open = true; renderLayers(); } } return; }
-  const nm = e.target.closest('.nm'); if (!nm) return; const n = byId(nm.closest('.lr').dataset.id); if (!n || isPinned(n)) return;
+  const nm = e.target.closest('.nm'); if (!nm) return; const n = byId(nm.closest('.lr').dataset.id); if (!n || isPinned(n) || K.baseStop([n])) return;
   nm.innerHTML = `<input value="${esc(n.name)}">`; const inp = nm.querySelector('input'); inp.focus(); inp.select();
   let fin = false; const done = ok => { if (fin) return; fin = true; const v = inp.value.trim(); if (ok && v && v !== n.name) edit(T.h.rename, () => { n.name = v; }); else renderLayers(); };
   inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); });
@@ -2401,7 +2471,7 @@ LB.forEach(([ic, t, fn, k]) => { const b = document.createElement('button'); b.c
 const pbody = $('#pbody'); let PS = [];
 const shut = new Set();
 function sec(id, title, icon, extra, ...els) {
-  const s = div('sec' + (shut.has(id) ? ' shut' : ''), `<button class="sh">${CHEV}${svg(icon, 14)}<span>${title}</span>${extra ? `<span class="sx">${extra}</span>` : ''}</button><div class="sb"><div><div class="sbi"></div></div></div>`);
+  const s = div('sec hy-sec' + (shut.has(id) ? ' shut' : ''), `<button class="sh hy-sh">${CHEV}<span>${title}</span>${extra ? `<span class="sx hy-sh-n">${extra}</span>` : ''}</button><div class="sb"><div><div class="sbi"></div></div></div>`);   // icon: kept for the callers, round 12's heads have none
   s.querySelector('.sbi').append(...els.filter(Boolean)); s.querySelector('.sh').addEventListener('click', () => { s.classList.toggle('shut'); if (s.classList.contains('shut')) shut.add(id); else shut.delete(id); });
   return s;
 }
@@ -2556,12 +2626,13 @@ function selLabel() { if (selBcache.v !== S.selV) selBcache = { v: S.selV, b: se
 /* ---- the options bar: only the active tool's or mode's options ---- */
 const mb = $('#obar');
 const PIV = [[-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
-let OB = [];
+let OB = [], xfKh = null;
+const XF_KEYS = [{ id: 'ratio', keys: ['shift'], t: 'Proportions' }, { id: 'centre', keys: ['alt'], t: 'From the centre' }, { id: 'done', keys: ['enter'], t: '' }];
 function ofield(label, o) {
   const el = document.createElement('label'); el.className = 'xff'; el.innerHTML = `<span class="xfl">${label}</span><input><span class="xfu">${o.unit || ''}</span>`;
   const f = numIn(el.querySelector('input'), { ...o, pct: o.pct ?? o.unit === '%' }, el, el.querySelector('.xfl'));
   if (o.tip) { el.dataset.tip = o.tip; el.dataset.side = 'bottom'; }
-  OB.push(f.sync); return el;
+  OB.push(f.sync); el._o = o; return el;   // _o: the strip's fill on the board (dockwork.js)
 }
 function obtn(icon, tip, key, fn, cls = '') { const b = document.createElement('button'); b.className = 'oib ' + cls; b.innerHTML = svg(icon, 16); b.dataset.tip = tip; if (key) b.dataset.key = key; b.dataset.side = 'bottom'; b.addEventListener('click', fn); return b; }
 function otext(icon, label, fn, tip) { const b = document.createElement('button'); b.className = 'mbt'; b.innerHTML = svg(icon, 15) + `<span class="tx">${label}</span>`; b.dataset.tip = tip || label; b.dataset.side = 'bottom'; b.addEventListener('click', fn); return b; }
@@ -2596,6 +2667,8 @@ function updModeBar() {
   const key = curKey();
   if (key === S.mbKey) { OB.forEach(f => f()); if (S.xf) syncXfBar(); const l = $('#mbl'); if (l) { const t = S.hasSel ? selLabel() : ''; if (l.textContent !== t) l.textContent = t; } return; }
   S.mbKey = key; OB = []; const oc = div('oc'), add = (...els) => oc.append(...els.filter(Boolean));
+  // free transform's keys under the bar while it lasts (the app's ui/hy/keyhint.js, owner 2026-10-08): ⇧ the corner's proportions, ⌥ the pivot
+  if (S.xf && !xfKh && window.hyKeyHint) xfKh = hyKeyHint.show($('#obar'), 'xf', XF_KEYS, { place: K.xfPlace || 'below' }); else if (!S.xf && xfKh) { xfKh.hide(); xfKh = null; }
   if (S.xf) {
     add(omic('xform', T.freeTransform)); xfBar(add);
     add(osp(), obtn('x', T.cancelXf, 'Esc', cancelXf), obtn('check', T.commitXf, '↵', () => { applyXf(); toast(T.xfApplied, 'check'); }, 'ok'));
@@ -2619,6 +2692,7 @@ function updModeBar() {
     else if (t === 'pick') add(osel([['1', T.pointSample], ['3', T.avg3], ['5', T.avg5], ['11', T.avg11]], () => String(S.pickSize), v => S.pickSize = +v, T.sampleSize), osel([['all', T.allLayers], ['cur', T.currentLayer]], () => S.pickAll ? 'all' : 'cur', v => S.pickAll = v === 'all', T.sample));
     else if (t === 'hand') add((() => { const e = document.createElement('span'); e.className = 'hint2'; e.textContent = trF(T.handHint); return e; })());
     else if (t === 'select') add((() => { const e = document.createElement('span'); e.className = 'hint2'; e.textContent = trF(T.selectHint); return e; })());
+    if (K.barHint) add(K.barHint(t));   // what ⌘ does with this tool (pickwork.js)
   }
   mb.replaceChildren(oc); mb.classList.remove('tight');
   if (oc.scrollWidth > oc.clientWidth + 1) mb.classList.add('tight');   // the bar is as wide as its tool up to its cap: past that the labels fold
@@ -2702,7 +2776,7 @@ async function removeBackground() {
     if (j && j.mask) mc = await maskFromURL(j.mask, n.c.width, n.c.height);
     else { const w = sm.width, h = sm.height, d = sm.getContext('2d').getImageData(0, 0, w, h).data, m = floodMask(d, w, h, borderSeeds(w, h).slice(0, 400), 30, true), t = maskToCanvas(m, w, h, true); mc = mk(n.c.width, n.c.height); const x = mc.getContext('2d'); const tt = mk(mc.width, mc.height); tt.getContext('2d').drawImage(t, 0, 0, mc.width, mc.height); blurInto(x, tt, 1); }
     mc._v = 1; const bgc = borderColor(n.c);
-    edit(T.h.removeBg, () => { n.mask = { c: mc, density: 100, feather: 0, on: true, clean: true }; n.bgc = bgc; if (!BG || BG === '#ffffff') BG = '#232327'; });
+    edit(T.h.removeBg, () => { n.mask = { c: mc, density: 100, feather: 0, on: true, clean: true }; n.bgc = bgc; if (BG === '#ffffff') BG = '#232327'; });   // transparent stays
     S.editMask = false; refresh(); toast(j ? T.bgRemoved : T.bgRemovedLocal, 'removebg');
     window.__lastRemoveBg = { how: j ? 'vision' : 'local', ms: j ? j.ms : null };
   } catch (e) { toast(T.failed + e.message, 'x'); }
@@ -2962,7 +3036,7 @@ if (GS.splitH != null) S.splitH = GS.splitH;
 const side = $('#side');
 const sideOpen = () => !(GS.g1.closed && GS.g2.closed);
 document.querySelectorAll('.tab').forEach(tb => { const d = PN.find(x => x.id === tb.dataset.t); if (!d) return;
-  tb.innerHTML = `<span class="ti">${svg(d.icon, 15)}</span><span class="tl">${d.name}${d.id === 'layers' ? ' <span class="tc" id="lcount"></span>' : ''}</span>`; if (d.key) { tb.dataset.tip = d.name; tb.dataset.key = d.key; tb.dataset.side = 'bottom'; } });
+  tb.innerHTML = `<span class="ti">${svg(d.icon, 14)}</span><span class="tl">${d.name}${d.id === 'layers' ? ' <span class="tc" id="lcount"></span>' : ''}</span>`; if (d.key) { tb.dataset.tip = d.name; tb.dataset.key = d.key; tb.dataset.side = 'bottom'; } });
 document.querySelectorAll('.pg .gm').forEach(b => { b.dataset.tip = T.groupMenu; b.dataset.side = 'left'; });
 $('#split').dataset.tip = T.splitTip;
 function setTab(g, t, quiet) {
@@ -2993,7 +3067,7 @@ function togglePanel(id) {
 function setShut(g, v) { GS[g].shut = v; saveGS(); applySplit(); }
 document.querySelectorAll('.pg').forEach(pg => {
   const g = pg.dataset.g, strip = pg.querySelector('.tabs');
-  pg.querySelector('.gm').innerHTML = svg('dots', 16);
+  pg.querySelector('.gm').innerHTML = svg('dots', 14);
   strip.addEventListener('click', e => {
     const tb = e.target.closest('.tab'); const gm = e.target.closest('.gm');
     if (gm) { const r = gm.getBoundingClientRect();
@@ -3307,11 +3381,12 @@ function renameFrame() {
 }
 $('#tlibR').dataset.tip = T.library; $('#tlibR').dataset.key = '⌘ .'; $('#tlibR').dataset.side = 'bottom'; $('#tlibR').setAttribute('aria-label', T.library);
 $('#libp .lhd b').textContent = T.library; $('#libp .lhd .note').innerHTML = T.libHint;
-const bSave = $('#bSave'), bCancel = $('#bCancel'), bset = $('#bset');
-bSave.innerHTML = `${svg('check', 14, 2.4)}<span>${T.save}</span>`; bSave.dataset.tip = T.saveTip; bSave.dataset.key = '⌘ ↵'; bSave.dataset.side = 'bottom';
-bCancel.textContent = T.cancel; bCancel.dataset.tip = T.cancelTip; bCancel.dataset.side = 'bottom';
+// Cancel and Save, the Studio's session actions top right: Hyimg's one element for them in every Studio (ui/hy/actions.js; owner 2026-10-09:
+// «кнопки Done у нас всегда стандартизированы справа вверху ... чтобы они везде были идентичны»); the keys stay Esc and ⌘↵
+$('#topr').actions = [{ id: 'cancel', label: T.cancel, tip: T.cancelTip, key: 'Esc', run: () => cancelFrame() },
+  { id: 'save', label: T.save, tip: T.saveTip, key: '⌘ ↵', primary: true, run: () => saveFrame() }];
+const bset = $('#bset');
 bset.innerHTML = svg('gear', 18, 1.8); bset.dataset.tip = T.settings; bset.dataset.side = 'left'; bset.setAttribute('aria-label', T.settings);
-bSave.addEventListener('click', saveFrame); bCancel.addEventListener('click', cancelFrame);
 function closeEditor() { if (BM) exitBoard(); else if (HOST) HOST.close(); else toast(T.closedNoSave, 'x'); }
 function cancelFrame() {
   if (S.saving) return toast(T.savingWait, 'frame');
@@ -3360,7 +3435,7 @@ function common(n, d) {
   if (safeId(d.id)) n.id = d.id;
   Object.assign(n, { visible: d.visible !== false, opacity: d.opacity ?? 100, fill: d.fill ?? 100, blend: d.blend || n.blend, clip: !!d.clip, link: d.link || null });
   if (d.locks) n.locks = { alpha: !!d.locks.alpha, pixels: !!d.locks.pixels, pos: !!d.locks.pos, all: !!d.locks.all };
-  if (d.c2a) n.c2a = true; if (d.bgc) n.bgc = d.bgc; if (d.color) n.color = d.color; return n;
+  if (d.c2a) n.c2a = true; if (d.bgc) n.bgc = d.bgc; if (d.color) n.color = d.color; if (d.base) n.base = true; return n;
 }
 // Fill left the panel (owner 2026-10-07: «fill уберем»): a layer saved with a fill takes it into its opacity, which draws the same (a
 // layer's alpha is opacity × fill, alphaOf); a clipping base keeps its fill, it is how its clipped layers show, so it draws as before
@@ -3396,10 +3471,11 @@ async function loadDoc() {
     if (!DOC) throw new Error('no frame document (?doc=)');
     const r = await fetch(fileURL(DOC), { cache: 'no-store' }); if (!r.ok) throw new Error(`${r.status} ${DOC}`);
     const d = await r.json();
-    W = clamp(Math.round(d.size[0]), 16, DOCMAX); H = clamp(Math.round(d.size[1]), 16, DOCMAX); BG = d.background === undefined ? '#ffffff' : d.background;
+    W = clamp(Math.round(d.size[0]), 16, DOCMAX); H = clamp(Math.round(d.size[1]), 16, DOCMAX); BG = d.background === undefined ? '#ffffff' : d.background;   // older: white
     VERSION = Number.isInteger(d.v) ? d.v : 0;
     FR.name = d.name || FR.name; $('#cFrameName').textContent = FR.name;
     root = (await Promise.all((d.layers || []).map(nodeIn))).filter(Boolean); foldFill(root);
+    K.markBase(root);   // the bottom original is the base layer, locked (basework.js); nothing is written until a Save
     root.push(mainNode(hostGrade()));   // the main grade: the card's grade, always there
     root.push(await mmIn(d));   // the master mask: the card's mask, else the document's, else a single picture's alpha
     S.gl = (Array.isArray(d.guides) ? d.guides : []).filter(g => g && (g.o === 'h' || g.o === 'v') && isFinite(g.pos)).map(g => ({ o: g.o, pos: +g.pos }));
@@ -3491,7 +3567,7 @@ function maskOut(n) { const m = n.mask; return m ? { file: fileOf(n.id + '|mask'
 const keepsLink = n => !!(n.src && (n.src.missing || n.c._v === n.src.v0));
 function nodeOut(n) {
   const b = { id: n.id, name: n.name, visible: n.visible, opacity: n.opacity, fill: n.fill ?? 100, blend: n.blend, clip: !!n.clip, link: n.link || null, locks: { ...n.locks } };
-  if (n.c2a) b.c2a = true; if (n.bgc) b.bgc = n.bgc; if (n.color) b.color = n.color;
+  if (n.c2a) b.c2a = true; if (n.bgc) b.bgc = n.bgc; if (n.color) b.color = n.color; if (n.base) b.base = true;
   if (n.type === 'group') return { ...b, kind: 'group', open: !!n.open, children: n.children.map(nodeOut) };
   if (n.type === 'adjust') return { ...b, kind: 'grade', params: n.params, mask: maskOut(n) };
   const geo = { x: n.x, y: n.y, w: n.w, h: n.h, rot: n.angle || 0, flip: [!!n.fx, !!n.fy], mask: maskOut(n) };
@@ -3573,7 +3649,7 @@ function sampleAt(cx, cy) {
   catch (e) { S.pickBlocked = true; return null; }
 }
 function hitTest(p) {
-  const out = []; (function rec(list) { for (let i = list.length - 1; i >= 0; i--) { const n = list[i]; if (!n.visible) continue; if (n.children) { const f = n.frame; if (f && (p.x < f.x || p.y < f.y || p.x > f.x + f.w || p.y > f.y + f.h)) continue; rec(n.children); continue; } if (n.type !== 'pixel' || n.locks.all || lockedByGroup(n)) continue; const q = LM(n).inverse().transformPoint(new DOMPoint(p.x, p.y)); if (q.x >= 0 && q.y >= 0 && q.x <= n.c.width && q.y <= n.c.height) out.push(n); } })(root);
+  const out = []; (function rec(list) { for (let i = list.length - 1; i >= 0; i--) { const n = list[i]; if (!n.visible) continue; if (n.children) { const f = n.frame; if (f && (p.x < f.x || p.y < f.y || p.x > f.x + f.w || p.y > f.y + f.h)) continue; rec(n.children); continue; } if (n.type !== 'pixel' || (n.locks.all && !n.base) || lockedByGroup(n)) continue; const q = LM(n).inverse().transformPoint(new DOMPoint(p.x, p.y)); if (q.x >= 0 && q.y >= 0 && q.x <= n.c.width && q.y <= n.c.height) out.push(n); } })(root);
   return out[0] || null;
 }
 function moveSet() {
@@ -3726,7 +3802,7 @@ addEventListener('blur', () => { S.space = false; S.altTap = null; updCursor(); 
 
 /* ================= splitter and layout ================= */
 const split = $('#split'), G1 = $('#g1'), G2 = $('#g2');
-const TAB = 38, SP = 9, MIN1 = 130, MIN2 = 190;   // a group's tabs, the line, the least heights the groups keep open
+const TAB = 36, SP = 8, MIN1 = 130, MIN2 = 190;   // a folded block (its 34 px header in its hairline), the gap between the blocks, the least heights they keep open
 function applySplit() {
   const total = side.clientHeight, sp = SP;
   G1.classList.toggle('closed', !!GS.g1.closed); G2.classList.toggle('closed', !!GS.g2.closed);
@@ -3766,7 +3842,7 @@ let TOPY = 106;
 function layout() {
   const cl = innerWidth - colW();
   mb.style.maxWidth = Math.max(160, cl - 12 - (12 + INSET)) + 'px';   // as wide as the tool needs, up to the right column
-  TOPY = mb.offsetTop + mb.offsetHeight + 8;
+  TOPY = K.obarDocked && K.obarDocked() ? 58 : mb.offsetTop + mb.offsetHeight + 8;   // on the board the bar rides over the dock (dockwork.js)
   document.documentElement.style.setProperty('--topy', TOPY + 'px');
   // the crumb gives way before the right corner: first board and page fold to their chevrons, then the frame name shortens
   const tr = $('#topr').getBoundingClientRect().left;
@@ -3790,7 +3866,7 @@ document.addEventListener('wheel', e => { if (e.ctrlKey || e.metaKey) e.preventD
 function init() {
   document.title = T.title;
   setTab('g1', GS.g1.tab, true); setTab('g2', GS.g2.tab, true); syncPanels(true);
-  document.body.classList.toggle('rul', S.rulers);
+  S.rulers = rulersKept(); document.body.classList.toggle('rul', S.rulers);
   resize(); patterns(); updColors(); setTool('select'); layout(); updHist();
   if (EMBED) { document.documentElement.classList.add('board'); ENT.v = ENT.to = 0; return; }   // loaded ahead of time: open(host) starts it
   looping = true; requestAnimationFrame(frame); loadDoc();
@@ -3803,7 +3879,7 @@ function openInBoard(h) {
   const t0 = performance.now();
   HOST = h; BM = true; DOC = h.item.doc; DIR = DOC.replace(/\/[^/]*$/, ''); FR.name = h.item.name || FR.name; $('#cFrameName').textContent = FR.name;
   const sz = h.item.size || [h.item.w, h.item.h]; W = clamp(Math.round(sz[0]), 16, DOCMAX); H = clamp(Math.round(sz[1]), 16, DOCMAX);
-  PREVIEW = h.preview || null; BG = PREVIEW ? null : '#ffffff';
+  PREVIEW = h.preview || null; BG = PREVIEW || h.item.alpha ? null : '#ffffff';   // the document's own from loadDoc; a new frame's is transparent
   try { FRAMEC = getComputedStyle(parent.document.documentElement).getPropertyValue('--frame').trim() || FRAMEC; } catch (e) {}
   document.documentElement.style.setProperty('--frame', FRAMEC);
   resize(); layout(); syncView(); renderView(); draw(); S.dirty = false;
@@ -3835,9 +3911,10 @@ Object.assign(K, { S, T, svg, esc, mk, copyC, bump, one, selNodes, topSel, byId,
   featherDialog, valueDialog, copyToLayer, duplicate, deleteSel, groupSel, ungroup, mergeDown, mergeVisible, rasterize, toggleClip, clipPairAt, addMask, deleteMask, invertMask,
   maskMenu, mmMenu, enterMaskMode, applyMaskMode, leaveMaskMode, toggleFilm, startFT, undo, fillSelection, hitTest, toDoc, pixNode, docCanvas, insertAbove, lk, lockedByGroup,
   userLock, setLock, dockRect, clearInSel, linkSel, newLayer, setTool, dims: () => [W, H], view, get dpr() { return dpr; }, adjNode, deepCopy, HyCG, putFile, fileURL,
-  loadImg, frameName: () => FR.name, renderView: () => { S.dirty = true; } });
+  TOOLS, loadImg, frameName: () => FR.name, renderView: () => { S.dirty = true; }, moveSet, boxOf, aabb, isDesc, mmCopy });
 })();
 </script>
+<script src="basework.js"></script><script src="pickwork.js"></script><script src="dockwork.js"></script>
 <script src="maskwork.js"></script><script src="clipwork.js"></script><script src="selwork.js"></script><script src="menus.js"></script>   <!-- after the page's script: they take window.hyEdK -->
 </body>
 </html>

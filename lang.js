@@ -4,6 +4,16 @@
 // A Hyimg without HY.t (older than 2026-10-06) shows the English.
 const P = "frames::";
 const RU = {
+  // «Clear all» (owner 2026-10-07): the Raw Editor panel's menu and the image studio's master rows
+  "Clear all": "Очистить все",
+  // the image studio, 2026-10-07: the base layer (editor/basework.js), ⌘ picks a layer (pickwork.js), copy and paste on the rows (menus.js)
+  "Base layer: only hide": "Базовый слой: только скрыть",
+  "⌘ drags the layer under the pointer": "⌘ тянет слой под курсором",
+  "⌘ picks the layer under the pointer": "⌘ выбирает слой под курсором",
+  "⌘ moves without Auto-Select": "⌘ двигает без автовыбора",
+  "No Raw Editor copied yet": "Raw Editor еще не скопирован",
+  "Nothing applied to copy": "Копировать нечего, ничего не применено",
+  "The master Raw Editor back to neutral and the master Mask to white, one step": "Мастер Raw Editor в нейтраль и мастер-маска в белое, одним шагом",
   // the grade is «Raw Editor» in both languages, the panel and the kind in «Copy properties ›» alike, as Russian Photoshop keeps «Camera
   // Raw» (owner 2026-10-06, it was «Цветокор» there and «Цветокоррекция» here: one word now, no «props::» context needed)
   "Raw Editor only on images, frames and 3D cards": "Raw Editor только у картинок, фреймов и 3D-карточек",
@@ -44,6 +54,9 @@ const RU = {
   "HTML frame": "HTML-фрейм",
   "still…": "снимок…",
   "Double-click: the live page · its edges resize it": "Двойной клик: живая страница · края меняют ее размер",
+  "Double-click: Dev Studio · the live page on the bar over it": "Двойной клик: Dev Studio · живая страница на плашке над фреймом",
+  "Live view": "Живой просмотр",
+  "The live page: device sizes, the frame's edges resize it": "Живая страница: размеры устройств, края рамки меняют ее размер",
   "HTML frame: a live page on the canvas, double-click to scroll and click": "HTML-фрейм: живая страница на холсте, двойной клик, чтобы листать и нажимать",
   // the image frame (imgframe.js)
   "{n} images": ["{n} картинка", "{n} картинки", "{n} картинок"],
@@ -54,31 +67,31 @@ const RU = {
   "Select images or a group with images to make a frame of": "Выдели картинки или группу с картинками, из которых сделать фрейм",
   "Only images go into a frame: deselect the rest": "Во фрейм идут только картинки: сними выделение с остального",
   "Frame reduced to 8000 px: the images lie far apart": "Фрейм уменьшен до 8000 px: картинки лежат далеко друг от друга",
-  "{frames}: each image in its own, double-click opens the editor": "{frames}: каждая картинка в своем, двойной клик открывает редактор",
-  "Frame: {pics} inside, double-click opens the editor": "Фрейм: {pics} внутри, двойной клик открывает редактор",
+  "{frames}: each image in its own, double-click opens Image Studio": "{frames}: каждая картинка в своем, двойной клик открывает Image Studio",
+  "Frame: {pics} inside, double-click opens Image Studio": "Фрейм: {pics} внутри, двойной клик открывает Image Studio",
   "Frame not made: {e}": "Фрейм не сделан: {e}",
-  "Opening the image studio": "Открываю студию картинок",
+  "Opening Image Studio": "Открываю Image Studio",
   "Frame not read: {e}": "Фрейм не прочитан: {e}",
   "The frame has no images from the library": "Во фрейме нет картинок из библиотеки",
   "Unframed: {pics} back on the board": "Фрейм разобран: {pics} снова на доске",
-  "Frame editor": "Редактор фрейма",
+  "Image Studio": "Image Studio",
   "“{name}” saved: {size}": "«{name}» сохранен: {size}",
   ", version {v}": ", версия {v}",
   " · version {v}": " · версия {v}",
   "Copy: this frame is already on the board": "Копия: этот фрейм уже есть на доске",
   "Frame · {size} px": "Фрейм · {size} px",
-  "Open frame editor · Enter": "Открыть редактор фрейма · Enter",
+  "Open in Image Studio · Enter": "Открыть в Image Studio · Enter",
   "Make frame": "В один фрейм",
   "All {pics} in one frame · ⌥⌘G": "Все {pics} в один фрейм · ⌥⌘G",
   "Frame each ({n})": "Каждый в свой фрейм ({n})",
   "Each image in its own frame, in its place · ⌥⇧⌘G": "Каждая картинка в свой фрейм, на ее месте · ⌥⇧⌘G",
-  "Open frame editor": "Открыть редактор фрейма",
+  "Open in Image Studio": "Открыть в Image Studio",
   "Unframe": "Разобрать фрейм",
-  // the board's mode switch (imgframe.js, owner 2026-10-06)
+  // the board's mode switch (imgframe.js, owner 2026-10-06): the short label, the studio's name (owner 2026-10-08: Image Studio)
   "Image": "Картинка",
-  "Image studio for the selected frame or image": "Студия картинок для выбранного фрейма или картинки",
-  "Select one image or frame: the image studio opens for it": "Выбери одну картинку или фрейм: для них откроется студия картинок",
-  "Double-click or Enter: the editor · the images inside never change": "Двойной клик или Enter: редактор · картинки внутри не меняются",
+  "Image Studio for the selected frame or image": "Image Studio для выбранного фрейма или картинки",
+  "Select one image or frame: Image Studio opens for it": "Выбери одну картинку или фрейм: для них откроется Image Studio",
+  "Double-click or Enter: Image Studio · the images inside never change": "Двойной клик или Enter: Image Studio · картинки внутри не меняются",
   // the colour grade of any picture (grade.js, owner 2026-10-06)
   "Raw Editor": "Raw Editor",
   "Raw Editor · click to change": "Raw Editor · клик, чтобы изменить",
@@ -231,6 +244,12 @@ const RU = {
   // the board's dock while the studio is open (imgframe.js editorDock)
   "Fit on screen · ⌘0": "Вписать в экран · ⌘0",
   "Actions · ⌘K": "Действия · ⌘K",
+  // the studio's tools in the dock (studiodock.js, editor/dockwork.js; owner 2026-10-08, round 11 D3)
+  "Select and move": "Выбор и перемещение",
+  "hold and drag up for the others": "зажми и веди вверх: остальные",
+  "Hold, or click here: the other tools": "Зажми или нажми здесь: остальные инструменты",
+  "Colors": "Цвета",
+  "X swaps, D resets": "X меняет местами, D сбрасывает",
   // the whole image studio (editor/index.html, its table T through i18n.js hyEdTr; owner 2026-10-07: «the rest of the image studio being
   // English in Russian mode»): Photoshop's Russian names where they exist, the board's words where the board has them (Прозрачность,
   // Отмена, Сохранить); a function's key is its English with its parameters' names, a list of 3 forms is picked by the number
@@ -511,7 +530,7 @@ const RU = {
   "Mask restored": "Маска восстановлена",
   "Transform cancelled": "Трансформирование отменено",
   "Transform applied": "Трансформирование применено",
-  "This works when the editor is open in Hyimg": "Это работает, когда редактор открыт в Hyimg",
+  "This works when Image Studio is open in Hyimg": "Это работает, когда Image Studio открыта в Hyimg",
   " piece": " фрагмент",
   "The layer position is locked": "Положение слоя заблокировано",
   "Select a layer": "Выбери слой",

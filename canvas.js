@@ -2,7 +2,7 @@
 // height and see how it works, and frozen as a picture»). At rest the card shows a still of the page, made by the server in Chromium
 // (POST /api/htmlstill), so a board of many frames costs pictures, not pages. A double click opens the page live in the card: it
 // scrolls and clicks like a browser, the frame's edges change the page's viewport (its width and height in css px), the dock offers
-// device sizes, «Обновить», «Снимок» and «Готово». Then a new still is made.
+// device sizes, Reload, Open in <Browser> and Done stand top right (Hyimg ui/hy/actions.js). Then a new still is made.
 //
 // The card on the board: {type: "htmlframe", src: "html/<name>/index.html", vw, x, y, w, h, name?}. vw is the viewport width in css px;
 // its height follows the card's shape (vh = vw · h / w): resizing at rest zooms the page like a picture, resizing live widens the page.
@@ -16,9 +16,10 @@ const ICON = window.hyIcon ? window.hyIcon("htmlFrame", 18, 1.8) : "";   // an H
 const PRESETS = [["Phone", 390, 844], ["Tablet", 834, 1194], ["Laptop", 1280, 800], ["Desktop", 1440, 900]];   // names through t()
 const enc = encodeURIComponent, libUrl = p => "/lib/" + p.split("/").map(enc).join("/");
 let HY, t = k => k;
-const L = { id: null, s: 1, frame: null, bar: null };   // the frame open live, its scale (board units per css px)
+const L = { id: null, s: 1, frame: null, bar: null, zoom: null, acts: null };   // the frame open live, its scale (board units per css px), who zooms
 
 const vhOf = it => Math.max(1, Math.round(it.vw * it.h / it.w));
+const claimed = () => !!(HY && HY.claimed && HY.claimed(TYPE));   // another plugin opens the frame on a double-click (HY.opener)
 const stillOf = (it, vw = it.vw, vh = vhOf(it)) => { const d = it.src.replace(/[^/]+$/, ""), b = it.src.split("/").pop().replace(/\.html?$/i, ""); return `${d}.stills/${b}-${vw}x${vh}.png`; };
 const asked = new Set();
 async function makeStill(it) {
@@ -27,6 +28,19 @@ async function makeStill(it) {
 }
 const engineName = () => /HyimgCEF/.test(navigator.userAgent) ? "Chromium" : (() => { try { return window.top.webkit && window.top.webkit.messageHandlers ? "WebKit" : null; } catch { return null; } })() || (/Chrome\//.test(navigator.userAgent) ? "Chrome" : /Safari\//.test(navigator.userAgent) ? "Safari" : t("browser"));
 
+// The still at the size the card has on screen (owner 2026-10-08, the «UI» board lagged on zoom and went blank in places): far out a
+// frame 50 px wide decoded its whole 1440 px picture, 21 of them 109 MB. It asks the server's thumbnail of its still, 640 or 1280 px wide,
+// by its width on screen in device px (the board's view hook), and the still itself beyond that; a sharper one is decoded before it
+// replaces the one shown, mid-gesture a card keeps what it has (as Dev studio's HTML cards, cards.js).
+const STEPS = [640, 1280];
+const stepFor = dev => STEPS.find(s => dev <= s * 1.1) || 0;   // 0: the still itself
+const urlOf = (it, step, v) => step ? `/thumb?p=${enc(stillOf(it))}&s=${step}${v ? `&v=${v}` : ""}` : libUrl(stillOf(it)) + (v ? `?v=${v}` : "");
+function swapTo(img, u) {
+  if (img._u === u) return;
+  if (!img.complete || !img.naturalWidth) { img._u = u; img.src = u; return; }
+  const nu = new Image(); nu.src = u; img._want = u;
+  nu.decode().then(() => { if (img._want === u && img.isConnected) { img._u = u; img.src = u; } }, () => {});
+}
 // the card at rest: the still of the page at its viewport; missing, it is made once and shown when ready
 function still(el, it, id, fresh) {
   let img = el.querySelector("img.hf");
@@ -34,13 +48,29 @@ function still(el, it, id, fresh) {
     el.innerHTML = `<img class="hf" alt="" decoding="async" draggable="false"><span class="hb"></span>`; img = el.querySelector("img.hf");
     img.addEventListener("load", () => el.classList.add("lo"));
     img.addEventListener("error", () => {
-      const cur = HY.board.items[id]; if (!cur) return; const p = stillOf(cur); if (asked.has(p)) return; asked.add(p);
-      el.classList.add("making"); makeStill(cur).then(r => { asked.delete(p); img.src = libUrl(r.path) + `?v=${r.mtime}`; }).catch(e => { el.title = t("Still not made: {e}", { e: e.message }); }).finally(() => el.classList.remove("making"));
+      const cur = HY.board.items[id]; if (!cur) return; const p = stillOf(cur);
+      if (el._made === p && el._hs) { el._hs = 0; img._u = urlOf(cur, 0, el._v); img.src = img._u; return; }   // a still made, its thumbnail failed: the still
+      if (asked.has(p)) return; asked.add(p);
+      el.classList.add("making");
+      makeStill(cur).then(r => { asked.delete(p); el._made = p; el._v = r.mtime; img._u = urlOf(cur, el._hs, r.mtime); img.src = img._u; })
+        .catch(e => { el.title = t("Still not made: {e}", { e: e.message }); }).finally(() => el.classList.remove("making"));
     });
   }
   const p = stillOf(it);
-  if (img._p !== p || fresh) { img._p = p; img.src = libUrl(p) + (fresh ? `?v=${Date.now()}` : ""); }
+  if (el._hs === undefined) el._hs = STEPS[0];   // 640 until the view says more
+  if (fresh) el._v = Date.now();
+  if (img._p !== p || fresh) { img._p = p; img._u = urlOf(it, el._hs, el._v); img.src = img._u; }
   el.querySelector(".hb").textContent = `HTML · ${it.vw}×${vhOf(it)}`;
+}
+// the board's view hook: the card's width on screen (0 off it), whether the board moves
+function view(id, el, px, moving) {
+  const it = HY.board.items[id], img = el.querySelector("img.hf");
+  if (!it || !img || !px || moving || L.id === id) return;
+  const dev = px * (devicePixelRatio || 1), need = stepFor(dev), less = stepFor(dev * 1.25), cur = el._hs ?? STEPS[0], size = s => s || Infinity;
+  // up as soon as it needs more, down only once it needs clearly less (no swaps back and forth at a step while the zoom wavers)
+  const next = size(need) > size(cur) ? need : size(less) < size(cur) ? less : cur;
+  if (next === cur) return;
+  el._hs = next; swapTo(img, urlOf(it, next, el._v));
 }
 
 function sizeFrame() {
@@ -59,13 +89,22 @@ function goLive(id) {
   const f = document.createElement("iframe"); f.className = "hfl"; f.title = it.name || it.src; f.src = libUrl(it.src); card.appendChild(f); L.frame = f;
   // the page is ours (same origin): Esc inside it ends the live view too
   f.addEventListener("load", () => { try { f.contentWindow.addEventListener("keydown", e => { if (e.key === "Escape") stop(); }); } catch {} });
+  // a pinch over the page zooms the board, a click in it gives the page the zoom (Hyimg ui/framezoom.js, owner 2026-10-08)
+  L.zoom = window.hyFrameZoom ? hyFrameZoom.attach(f, { card, local: true }) : null;
   L.bar = dockBar(); HY.dock(L.bar); sizeFrame(); HY.render();
+  // Reload, Open in <Browser> and Done top right, as in every Studio (Hyimg ui/hy/actions.js; owner 2026-10-09: «кнопки Done у нас всегда
+  // стандартизированы справа вверху»); the device sizes and the page's size stay in the dock
+  L.acts = document.body.appendChild(document.createElement("hy-studio-actions"));
+  L.acts.actions = [{ id: "reload", label: t("Reload"), title: t("Reload page · ⌘R in the frame"), run: () => { if (L.frame) L.frame.src = L.frame.src; } },
+    { id: "open", open: () => (L.id && HY.board.items[L.id] ? libUrl(HY.board.items[L.id].src) : ""), tip: t("Open page in a new tab") },
+    { id: "done", label: t("Done"), tip: t("Done"), key: "Esc", primary: true, run: () => stop() }];
 }
 // leave the page: its viewport is written into the card (one step to undo) and a new still is made
 function stop() {
   const id = L.id; if (!id) return; const it = HY.board.items[id], card = el(id);
+  if (L.zoom) L.zoom.detach(); L.zoom = null;
   if (L.frame) L.frame.remove(); L.frame = null; if (card) card.classList.remove("plg-live");
-  HY.dock(null); L.bar = null; L.id = null;
+  HY.dock(null); L.bar = null; L.id = null; if (L.acts) L.acts.remove(); L.acts = null;
   if (it) {
     const vw = Math.round(it.w / L.s);
     if (vw !== it.vw) { const before = HY.snap(); it.vw = vw; HY.commit(before, t("HTML: page width")); }
@@ -82,14 +121,10 @@ function dockBar() {
   const b = document.createElement("div"); b.className = "hfbar";
   b.innerHTML = PRESETS.map(([n, w, h]) => `<button class="wide" data-pre="${w}x${h}" title="${t(n)}: ${w}×${h}">${t(n)}</button>`).join("")
     + `<span class="sep"></span><label class="hfsz" title="${t("Page size in CSS pixels: type a number or drag the frame's edge")}"><input data-w inputmode="numeric" aria-label="${t("Page width")}">×<input data-h inputmode="numeric" aria-label="${t("Page height")}"></label>`
-    + `<span class="hfe" title="${t("The engine changes for the whole app: ⚙ › Engine")}">${engineName()}</span>`
-    + `<span class="sep"></span><button class="wide" data-a="reload" title="${t("Reload page · ⌘R in the frame")}">${t("Reload")}</button><button class="wide" data-a="open" title="${t("Open page in a new tab")}">${t("Open")}</button><button class="wide pri" data-a="done" title="${t("Done · Esc")}">${t("Done")}</button>`;
+    + `<span class="hfe" title="${t("The engine changes for the whole app: ⚙ › Engine")}">${engineName()}</span>`;
   b.addEventListener("click", e => {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.pre) { const [w, h] = t.dataset.pre.split("x").map(Number); return preset(w, h); }
-    if (t.dataset.a === "reload" && L.frame) L.frame.src = L.frame.src;
-    if (t.dataset.a === "open") window.open(libUrl(HY.board.items[L.id].src), "_blank");
-    if (t.dataset.a === "done") stop();
   });
   b.addEventListener("change", e => {
     const w = +b.querySelector("[data-w]").value, h = +b.querySelector("[data-h]").value;
@@ -131,7 +166,7 @@ export function register(hy) {
     .hfe { padding: 0 8px; color: var(--muted); font: 500 12px var(--sans); white-space: nowrap; }`;
   document.head.appendChild(st);
   // a click anywhere else on the board ends the live page, as «Готово» does
-  document.addEventListener("pointerdown", e => { if (!L.id) return; if (e.target.closest(`.plg[data-id="${L.id}"], #dock, .tidy, .he, #ctx`)) return; stop(); }, true);
+  document.addEventListener("pointerdown", e => { if (!L.id) return; if (e.target.closest(`.plg[data-id="${L.id}"], #dock, .tidy, .he, #ctx, hy-studio-actions, .hy-oi-menu`)) return; stop(); }, true);
   hy.register(TYPE, {
     opacity: true,   // the pictures' opacity: the bar's slider, the keys 1…9 and 0, «Copy properties» (owner 2026-10-06)
     render(card, it, id) {
@@ -139,14 +174,24 @@ export function register(hy) {
       if (L.id === id) { if (!card.contains(L.frame) && L.frame) card.appendChild(L.frame); sizeFrame(); return; }
       still(card, it, id);
     },
+    view,   // the still's size by the card's on screen
     frame(id) { return L.id === id; },   // live, the frame's edges change the page's viewport
     resized(id) { if (L.id === id) sizeFrame(); },
     dblclick(id) { goLive(id); },
+    // the page changed elsewhere (Dev mode wrote it): a new still
+    changed(id) { const card = el(id), it = HY.board.items[id]; if (card && it && L.id !== id) makeStill(it).then(() => still(card, it, id, true)).catch(() => {}); },
     onKey(e) { if (L.id && e.key === "Escape") { stop(); return true; } return false; },
     info(id, it) {
       return { name: it.name || t("HTML frame"), meta: `${it.vw}×${vhOf(it)} · ${it.src}`,
-        text: t("Double-click: the live page · its edges resize it") };
+        text: claimed() ? t("Double-click: Dev Studio · the live page on the bar over it") : t("Double-click: the live page · its edges resize it") };
     },
+  });
+  // another plugin opens the frame on a double-click (Dev studio's Dev mode, owner 2026-10-07): the live view is one click away on the bar
+  // over the frame; without such a plugin the double-click is the live view, and the bar has no button for it
+  if (hy.bar) hy.bar(ids => {
+    const it = ids.length === 1 && HY.board.items[ids[0]];
+    return it && it.type === TYPE && claimed() && L.id !== ids[0] ? [{ first: true, icon: window.hyIcon ? window.hyIcon("htmlFrame", 15, 1.9) : "", label: t("Live view"),
+      title: t("The live page: device sizes, the frame's edges resize it"), fn: () => goLive(ids[0]) }] : [];
   });
   hy.addButton(ICON, t("HTML frame: a live page on the canvas, double-click to scroll and click"), newFrame);
   registerImageFrame(hy);

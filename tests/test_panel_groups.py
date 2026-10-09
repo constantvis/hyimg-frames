@@ -2,7 +2,7 @@
 сложить тот блок, то есть коллапс. Либо наоборот, если вниз тяну, точно так же. А закрыть группу нельзя. Зачем ее закрывать? Как ее
 вообще вернуть? Не нужно ее закрывать, по сути, только одна настройка: это коллапс»). The line between Properties / Adjustments / History
 and Layers / Channels, dragged up past the top group's least height, folds the top group to its tabs; dragged down past the bottom
-group's, folds the bottom one; dragged back out, it opens again; a double click gives the automatic halves back; the active tab of a
+group's, folds the bottom one (to its header, 36 px with the block's hairline); dragged back out, it opens again; a double click gives the automatic halves back; the active tab of a
 folded group opens it. No menu, key or saved state closes a group; a reload keeps the fold and the split. Chromium and WebKit.
 
   HYIMG_REPO=<Hyimg checkout> python3 -m pytest tests/test_panel_groups.py
@@ -34,7 +34,7 @@ def test_the_split_folds_each_group_and_nothing_closes_one(hy, engine):
         g0 = fr.evaluate(GEO); assert not g0["s1"] and not g0["s2"] and not g0["off"], g0
         # up past the top group's least height: Properties folds to its tabs, Layers takes the room; the line still works
         drag(page, fr, -g0["g1"])
-        g1 = fr.evaluate(GEO); assert g1["s1"] and not g1["s2"] and g1["g1"] == 38 and not g1["off"], g1
+        g1 = fr.evaluate(GEO); assert g1["s1"] and not g1["s2"] and g1["g1"] == 36 and not g1["off"], g1   # a folded block: its 34 px header in its hairline (round 12 «A · Line»)
         assert g1["g2"] > g0["g2"] + 100, (g0, g1)
         for th in ("dark", "light"):
             page.evaluate(f"() => document.documentElement.dataset.theme = '{th}'"); fr.wait_for_timeout(300)
@@ -45,7 +45,7 @@ def test_the_split_folds_each_group_and_nothing_closes_one(hy, engine):
         g2 = fr.evaluate(GEO); assert not g2["s1"] and not g2["s2"] and g2["g1"] >= 130, g2
         # down past the bottom group's least height: Layers folds to its tabs
         drag(page, fr, g2["side"])
-        g3 = fr.evaluate(GEO); assert g3["s2"] and not g3["s1"] and g3["g2"] == 38 and not g3["off"], g3
+        g3 = fr.evaluate(GEO); assert g3["s2"] and not g3["s1"] and g3["g2"] == 36 and not g3["off"], g3
         for th in ("dark", "light"):
             page.evaluate(f"() => document.documentElement.dataset.theme = '{th}'"); fr.wait_for_timeout(300)
             shot(page, f"groups-bottom-folded-{th}-{engine}.png")

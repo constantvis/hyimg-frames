@@ -9,6 +9,7 @@ is left on sys.path. Each test runs with the HYIMG_* settings cleared and the La
 import importlib.util
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -19,8 +20,21 @@ INPAINT = ROOT / "inpaint"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# The core's guard (hyimg/tests/procguard.py) also when pytest runs tests/unit alone, which does not load tests/conftest.py: the
+# session's own cache folder, and the check of the person's ~/Library/Caches/Hyimg when the session ends
+_GUARD = Path(os.environ.get("HYIMG_REPO") or ROOT.parent / "hyimg") / "tests" / "procguard.py"
+procguard = sys.modules.get("procguard")
+if procguard is None and _GUARD.is_file():
+    _spec = importlib.util.spec_from_file_location("procguard", _GUARD)
+    procguard = sys.modules["procguard"] = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(procguard)
+if procguard:
+    procguard.install()
+CACHE = procguard.CACHE if procguard else tempfile.mkdtemp(prefix="hyimg-test-cache-")
+
 for _k in [k for k in os.environ if k.startswith(("HYIMG_", "REVIEW_"))]:
     del os.environ[_k]
+os.environ["HYIMG_CACHE_ROOT"] = CACHE   # cleared with the rest and put back: nothing falls back to ~/Library/Caches/Hyimg
 os.environ["HYIMG_LAMA"] = "/nonexistent/hyimg-unit/lama_fp32.onnx"   # lama.py reads it at import
 
 
@@ -35,6 +49,7 @@ def load(name, unique):
 def isolated(monkeypatch):
     for k in [k for k in os.environ if k.startswith(("HYIMG_", "REVIEW_"))]:
         monkeypatch.delenv(k)
+    monkeypatch.setenv("HYIMG_CACHE_ROOT", CACHE)
     monkeypatch.setenv("HYIMG_LAMA", "/nonexistent/hyimg-unit/lama_fp32.onnx")
     monkeypatch.delitem(sys.modules, "config", raising=False)
 
@@ -66,3 +81,8 @@ def library(tmp_path, monkeypatch):
     (lib / "frames").mkdir(parents=True)
     monkeypatch.setenv("HYIMG_LIBRARY_ROOT", str(lib))
     return lib
+
+
+def pytest_sessionfinish(session, exitstatus):   # once a session, with tests/conftest.py or without it
+    if procguard:
+        procguard.finish(session)

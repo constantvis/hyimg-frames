@@ -170,7 +170,10 @@ async function openPanel(ids) {
   // a preset pointed at in the menu: on the cards at once through the one queue (the last one pointed at wins, a sweep down the list does
   // not pile up), nothing in the board; null puts their grade back, keep: a click's change follows and paints them itself
   const preview = (p, keep) => { if (!P) return; P.pv = p || null; if (!keep) P.ids.forEach(id => { const el = cardEl(id); if (el) queue(el); }); };
-  const inst = CG.createPanel(wrap, first.grade ? CG.normalize(first.grade) : CG.defaults(), change, { theme: "inherit", title: t("Raw Editor"), t, pick: boardPick, preview });
+  // «Clear all» in the panel's menu (owner 2026-10-07): everything applied to these cards, every HY.props kind (the grade, the mask, crop…),
+  // one step to undo, the board's own way (HY.props.clear); the panel then shows the neutral grade
+  const clearAll = HY.props && HY.props.clear ? () => { HY.props.clear(P ? P.ids : ids); if (P) retarget(P.ids); } : null;
+  const inst = CG.createPanel(wrap, first.grade ? CG.normalize(first.grade) : CG.defaults(), change, { theme: "inherit", title: t("Raw Editor"), t, pick: boardPick, preview, clearAll });
   const x = document.createElement("button"); x.className = "hcg-ib hcgx"; x.title = t("Close · Esc"); x.setAttribute("aria-label", t("Close"));
   x.innerHTML = hyIcon("close", 0, 2); x.onclick = () => closePanel();
   wrap.querySelector(".hcg-top").appendChild(x);

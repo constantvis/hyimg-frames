@@ -89,7 +89,8 @@ test("the whole image studio is in Russian: every word of its table (editor/inde
     else if (v && typeof v === "object") walk(v); } };
   walk(c.T);
   assert.deepEqual([...c.__edMiss], [], "words without Russian");
-  const latin = out.filter(s => /[A-Za-z]{3,}/.test(s.replace(/Raw Editor|Hyimg|px|<\/?b>/g, "")));
+  // proper names stay English in Russian too (owner 2026-10-08: Image Studio, 3D Studio, Dev Studio, as Raw Editor)
+  const latin = out.filter(s => /[A-Za-z]{3,}/.test(s.replace(/Raw Editor|Image Studio|3D Studio|Dev Studio|Hyimg|px|<\/?b>/g, "")));
   assert.deepEqual(latin, [], "English left in the Russian table");
   assert.deepEqual(out.filter(s => /[ё—]|\.$/.test(s)), [], "no ё, no em dash, no period at the end");
   assert.equal(c.T.layersN(1), "1 слой"); assert.equal(c.T.layersN(3), "3 слоя"); assert.equal(c.T.layersN(5), "5 слоев");

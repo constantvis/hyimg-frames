@@ -66,7 +66,14 @@ def test_frame_still_live_sizes_and_agent(hy):
         wait(lambda: still.is_file())
         from PIL import Image
         im = Image.open(still); assert im.size == (1440, 900) and im.convert("RGB").getpixel((700, 880))[:3] == (10, 120, 200)
-        page.wait_for_function("() => { const i = document.querySelector('.plg[data-id=h1] img.hf'); return i && i.complete && i.naturalWidth === 1440 }", timeout=30000)
+        # the card shows its still at the size it has on screen (Hyimg 2026-10-08): 720 px wide here, the server's 1280 px thumbnail of it;
+        # far out the 640 one, close in the still itself (a 1440 px picture for a card 50 px wide made the far zoom lag)
+        nat = "() => { const i = document.querySelector('.plg[data-id=h1] img.hf'); return i && i.complete && decodeURIComponent(i.src).includes('.stills/index-1440x900.png') ? i.naturalWidth : 0 }"
+        page.wait_for_function(f"({nat})() === 1280", timeout=30000)
+        cam0 = page.evaluate("() => ({ ...cam })")
+        page.evaluate("() => { cam = { x: -100, y: -100, z: 0.15 }; render(); }"); page.wait_for_function(f"({nat})() === 640", timeout=15000)
+        page.evaluate("() => { cam = { x: 0, y: 0, z: 2.2 }; render(); }"); page.wait_for_function(f"({nat})() === 1440", timeout=15000)
+        page.evaluate("c => { cam = c; render(); }", cam0); page.wait_for_function(f"({nat})() === 1280", timeout=15000)
         assert page.locator(".plg[data-id=h1] .hb").inner_text() == "HTML · 1440×900"
         # live: the page scrolls and clicks inside the card
         page.dblclick(".plg[data-id=h1]")
@@ -81,7 +88,7 @@ def test_frame_still_live_sizes_and_agent(hy):
         page.fill(".hfbar [data-w]", "600"); page.press(".hfbar [data-w]", "Enter")
         page.wait_for_function("() => board.items.h1.vw === 600")
         vh = page.evaluate("() => Math.round(board.items.h1.vw * board.items.h1.h / board.items.h1.w)")
-        page.click(".hfbar [data-a=done]")
+        page.click("hy-studio-actions [data-a=done]")
         assert not page.locator(".plg[data-id=h1] iframe").count()
         wait(lambda: (lib / f"html/demo/.stills/index-600x{vh}.png").is_file())
         assert not errors, errors

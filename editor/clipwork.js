@@ -13,7 +13,8 @@
   const W = window.hyEdTr({
     copiedMask: 'Mask copied', copied: 'Copied', copiedGrade: 'Raw Editor settings copied', pastedMask: 'Pasted into the mask', pastedMasks: n => `Mask pasted on ${n} layers`,
     pastedLayer: 'Pasted as a new layer', pastedGrade: 'Raw Editor settings pasted', nothingCopied: 'Nothing copied yet', noProps: 'No properties copied yet',
-    propsPasted: 'Properties pasted', propsNone: 'These properties don\'t apply here', hPaste: 'Paste', hPasteMask: 'Paste Layer Mask', hPasteGrade: 'Paste Raw Editor',
+    propsPasted: 'Properties pasted', noGrade: 'No Raw Editor copied yet', nothingMask: 'No mask copied yet',
+    propsNone: 'These properties don\'t apply here', hPaste: 'Paste', hPasteMask: 'Paste Layer Mask', hPasteGrade: 'Paste Raw Editor',
     hPasteProps: 'Paste Properties', hMoveMask: 'Move Layer Mask', hCopyMask: 'Copy Layer Mask', maskMoved: 'Mask moved', maskCopied2: 'Mask copied to the layer',
     alone: 'The mask alone · ⌥-click its thumbnail to go back', layerN: 'Layer ', copy: 'Copy', pasteAsLayer: 'Paste as New Layer',
     pickPixel: 'Select a picture layer', noTarget: 'A mask goes on a picture or adjustment layer'
@@ -108,6 +109,13 @@
     x.putImageData(id, 0, 0);
     const path = `frames/board-masks/masks/m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.png`; await K.putFile(path, await toBlob(pic)); return path;
   }
+  // «Copy Raw Editor» on a Raw Editor row, the master's too: only its settings, here (⌘V) and on the board's clipboard (⌥⌘V there)
+  K.copyGrade = n => {
+    if (!n || n.type !== 'adjust' || n.mmask) return; const g = gradeDiff(n.params);
+    K.clip = { kind: 'grade', g, at: Date.now() }; propsOut({ grade: g }); K.toast(W.copiedGrade, 'copy');
+  };
+  // what the properties clipboard holds now, for the menus: {grade, mask} (this page's localStorage, the board keeps it fresh)
+  K.clipHas = kind => { try { const c = JSON.parse(localStorage.getItem(PCLIP) || 'null'); return !!(c && c.kinds && c.kinds[kind] !== undefined); } catch (er) { return false; } };
   K.copyProps = async n => {
     n = n || K.one(); if (!n) return; const kinds = {}, files = [];
     if (n.type === 'adjust' && !n.mmask) kinds.grade = gradeDiff(n.params);
@@ -124,9 +132,12 @@
     }
     return c;
   }
-  K.pasteProps = async () => {
+  // only: 'grade' or 'mask' (a master row's «Paste Raw Editor», «Paste Mask»); a master row takes only its own kind
+  K.pasteProps = async only => {
     const c = await propsIn(); if (!c) return K.toast(W.noProps, 'pasteProps');
-    const g = c.kinds.grade, m = c.kinds.mask; let pic = null, ns = [];
+    const o = K.one(); if (!only && o && (o.main || o.mmask)) only = o.main ? 'grade' : 'mask';
+    const g = only === 'mask' ? undefined : c.kinds.grade, m = only === 'grade' ? undefined : c.kinds.mask; let pic = null, ns = [];
+    if (only && (only === 'grade' ? g === undefined : !m)) return K.toast(only === 'grade' ? W.noGrade : W.nothingMask, 'pasteProps');
     if (m && (m.show || m.file)) {
       ns = K.selNodes().filter(canMask); if (!ns.length && K.one() && K.one().mmask) ns = [K.one()];
       if (ns.length) pic = await new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = K.fileURL(m.show || m.file); });
@@ -134,8 +145,9 @@
     if (g === undefined && !pic) return K.toast(W.propsNone, 'pasteProps');
     let gs = null; try { gs = pic && lumAlpha(alphaToBW(pic)); } catch (er) { gs = null; }
     const cs = gs ? ns.map(n => maskFrom(gs, n)) : [];
-    K.edit(W.hPasteProps, () => { if (g !== undefined) gradeInto(g || {}); ns.forEach((n, i) => { if (cs[i]) putMask(n, cs[i]); }); });
-    S.dirty = true; K.refresh(); K.toast(W.propsPasted, 'pasteProps');
+    const label = only === 'grade' ? W.hPasteGrade : only === 'mask' ? K.T.pasteMask || W.hPasteMask : W.hPasteProps;
+    K.edit(label, () => { if (g !== undefined) gradeInto(g || {}); ns.forEach((n, i) => { if (cs[i]) putMask(n, cs[i]); }); });
+    S.dirty = true; K.refresh(); K.toast(only === 'grade' ? W.pastedGrade : only === 'mask' ? W.pastedMask : W.propsPasted, 'pasteProps');
   };
   // a board mask (white, alpha what shows) as a black and white picture
   function alphaToBW(im) { const c = K.mk(im.naturalWidth || im.width, im.naturalHeight || im.height), x = c.getContext('2d');

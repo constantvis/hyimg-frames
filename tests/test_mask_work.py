@@ -33,7 +33,9 @@ def test_delete_fills_the_targeted_mask_and_cmd_i(hy, engine):
         focus(page, fr); page.keyboard.press("Backspace"); frame_tick(fr)
         assert fr.evaluate(MASKA, [b, .2, .8]) == 0 and fr.evaluate(MASKA, [b, .8, .8]) == 255 and fr.evaluate(MASKA, [b, .2, .2]) == 255
         after = fr.evaluate(PX, [750, 300])
-        assert near(after, [255, 255, 255, 255]) and not near(before, after), (before, after)   # the white paper shows at once
+        # the document's background shows at once: a new frame's is transparent (owner 2026-10-09), nothing drawn there, no checkerboard
+        # («а почему шахматка, когда мы можем полностью прозрачный просто сделать»): the board shows through
+        assert after[3] == 0 and before[3] == 255, (before, after)
         page.keyboard.press("Shift+Backspace"); frame_tick(fr)
         assert fr.evaluate(MASKA, [b, .2, .8]) == 255 and near(fr.evaluate(PX, [750, 300]), before)
         # ⌘I on the targeted mask: inverted; ⇧⌘I: the selection inverted
@@ -97,13 +99,14 @@ def test_contract_expand_smooth_and_the_mask_plate(hy, engine):
         assert fr.evaluate(LOOKA, [b, 146 / 300]) < 30 and fr.evaluate(LOOKA, [b, 154 / 300]) > 225, "the long edge stays where it was, crisp"
         assert fr.evaluate(LOOKA, [b, 20 / 300]) == 0 and fr.evaluate(LOOKA, [b, 280 / 300]) == 255
         assert fr.evaluate("() => __ed.S.undo.length") == n0 + 5, "one step for each gesture (four slider moves and the notch)"
-        # the plate: bottom centre over the dock, the targeted thumbnail outlined
+        # the plate: bottom centre over the dock and the brush's options riding over it (round 11 D3), the targeted thumbnail outlined
         pick(fr, b, True); frame_tick(fr); settle(fr, 400)
         plate = fr.evaluate("""() => { const r = document.querySelector('#mplate hy-plate').getBoundingClientRect(); return {
-           on: document.getElementById('mplate').classList.contains('on'), x: r.left + r.width / 2, b: r.bottom, w: innerWidth, h: innerHeight }; }""")
+           on: document.getElementById('mplate').classList.contains('on'), x: r.left + r.width / 2, b: r.bottom, w: innerWidth, h: innerHeight,
+           strip: document.getElementById('obar').getBoundingClientRect().top }; }""")
         dock = page.evaluate("""() => { const r = document.getElementById('dock').getBoundingClientRect(), f = document.querySelector('.ifed iframe').getBoundingClientRect();
            return { x: r.left + r.width / 2 - f.left, t: r.top - f.top }; }""")
-        assert plate["on"] and abs(plate["x"] - dock["x"]) < 2 and 0 < dock["t"] - plate["b"] < 30, (plate, dock)
+        assert plate["on"] and abs(plate["x"] - dock["x"]) < 2 and plate["strip"] < dock["t"] and 0 < plate["strip"] - plate["b"] < 30, (plate, dock)
         assert fr.evaluate(f"() => document.querySelector('#rows .lr[data-id=\"{b}\"] .tb2.msk').classList.contains('edit')")
         for mode in ("black", "white", "bw", "off", "red"):
             fr.locator(f"#mplate hy-segmented button[value={mode}]").click(); settle(fr, 80)

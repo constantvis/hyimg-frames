@@ -81,7 +81,7 @@ def test_double_click_on_a_picture_opens_the_image_mode(hy, engine):
         # again, and Save: one step from the picture to the frame, the same selection and view
         page.dblclick(".it[data-id=a1]")
         fr = editor(page)
-        fr.click("#bSave")
+        fr.click("#topr [data-a=save]")
         page.wait_for_function("() => board.items.a1.type === 'imgframe' && board.items.a1.v === 1", timeout=60000)
         closed(page)
         assert page.evaluate("() => [...sel]") == ["a1"] and page.evaluate("() => past.length") == steps0 + 1
@@ -133,7 +133,7 @@ def test_a_masked_picture_writes_its_layer_mask_only_on_save(hy, engine):
         assert library(lib) == files0 and not page.evaluate("() => !!board.items.b1.type")
         page.dblclick(".it[data-id=b1]")
         fr = editor(page)
-        fr.click("#bSave")
+        fr.click("#topr [data-a=save]")
         page.wait_for_function("() => board.items.b1.type === 'imgframe' && board.items.b1.v === 1", timeout=60000)
         closed(page)
         card = page.evaluate("() => board.items.b1"); d = card["doc"].rsplit("/", 1)[0]

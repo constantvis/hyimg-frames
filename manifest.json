@@ -2,7 +2,9 @@
  "title": "Frames",
  "title_ru": "Фреймы",
  "version": "0.3.0",
+ "description": "Image Studio: image frames with layers, masks and colour grading; HTML pages as cards",
+ "description_ru": "Image Studio: фреймы картинок со слоями, масками и цветом; HTML-страницы карточками",
  "canvas": "canvas.js",
- "about": "Frames on the Hyimg canvas: an HTML page as a card, live on a double-click; an image frame with its editor (layers, masks, brush, content-aware fill, color grading), the originals never change",
+ "about": "Frames on the Hyimg canvas: an HTML page as a card, live on a double-click; an image frame opened in Image Studio (layers, masks, brush, content-aware fill, color grading), the originals never change",
  "server": "inpaint/routes.py"
 }

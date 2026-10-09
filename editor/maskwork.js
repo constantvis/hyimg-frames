@@ -116,18 +116,24 @@
   const seg = plate.querySelector('hy-segmented');
   seg.addEventListener('hy-change', e => setShow(e.detail.value));
   plate.querySelector('hy-button').addEventListener('click', () => K.leaveMask());
-  // the dock this page shows: its own, or on the board the board's (the page is a frame over it)
+  // the dock this page shows: its own, or on the board the board's (the page is a frame over it); on the board the options strip rides over
+  // the dock (dockwork.js), and the plate stands over the strip
   function dockTop() {
     const own = $('#dock'), r = own && own.getBoundingClientRect(); if (r && r.width) return r.top;
+    const ob = $('#obar'); if (ob && ob.classList.contains('indock') && ob.offsetWidth) return ob.getBoundingClientRect().top;
     try { const pd = parent !== window && parent.document.getElementById('dock'), fe = frameElement;
       if (pd && fe) return pd.getBoundingClientRect().top - fe.getBoundingClientRect().top; } catch (er) {}
     return innerHeight - 78;
   }
-  let plateKey = '';
+  let plateKey = '', kh = null;
+  // the brush's keys in the Hint bar as a mask is taken up, gone once one is used (the app's ui/hy/keyhint.js place "top", owner 2026-10-09);
+  // ⌥ is the eyedropper, not shown
+  const KEYS = [{ id: 'size', keys: ['[', ']'], t: 'Brush size' }, { id: 'swap', keys: ['x'], t: 'Black / white' }, { id: 'done', keys: ['enter', 'escape'], t: 'Done' }];
   function syncPlate(force) {
     const n = masked(), on = !!n && !!S.ready && !S.xf, val = !S.film ? 'off' : S.maskShow || 'red';
     const dr = K.dockRect && K.dockRect(), cx = dr && dr.width ? dr.left + dr.width / 2 : innerWidth / 2, key = [on, val, Math.round(cx), Math.round(dockTop())].join('|');
     if (key === plateKey && !force) return; plateKey = key;
+    if (on && !kh && window.hyKeyHint) kh = hyKeyHint.show(plate.querySelector('hy-plate'), 'mask', KEYS, { place: 'top' }); else if (!on && kh) { kh.hide(); kh = null; }
     plate.classList.toggle('on', on); plate.style.left = cx + 'px'; plate.style.bottom = Math.max(12, innerHeight - dockTop() + 10) + 'px';
     if (seg.value !== val) seg.value = val;
   }

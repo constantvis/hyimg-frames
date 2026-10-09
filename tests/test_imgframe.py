@@ -180,7 +180,7 @@ def test_frame_make_edit_save_undo_explode(hy, engine):
         for k in range(1, 21): page.mouse.move(*to(100 + k * 20, 225 + (k % 2) * 4))
         page.mouse.up(); time.sleep(0.3)
         assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).length") == 3
-        fr.click("#bSave")
+        fr.click("#topr [data-a=save]")
         page.wait_for_function(f"() => board.items['{fid}'].v === 2", timeout=60000)
         closed(page)
         card2 = page.evaluate(f"() => board.items['{fid}']")
@@ -215,7 +215,7 @@ def test_frame_make_edit_save_undo_explode(hy, engine):
         fr = editor(page)
         assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).length") == 3   # the painted layer came back from its file
         fr.evaluate("() => __ed.canvasSize(1000, 900, 0, 0)")
-        fr.click("#bSave")
+        fr.click("#topr [data-a=save]")
         page.wait_for_function(f"() => board.items['{fid}'].v === 3", timeout=60000); closed(page)
         assert page.evaluate(f"() => [board.items['{fid}'].w, board.items['{fid}'].h, board.items['{fid}'].x]") == [1000, 900, 0]
         assert Image.open(lib / f"{dirp}/render.3.png").size == (1000, 900)
@@ -275,7 +275,7 @@ def test_native_pixels_each_group_and_library_drop(hy):
         assert (top["w"], top["h"], top["orig"], top["path"], top["cw"]) == (500, 500, True, "pics/lib.png", 500), top   # its own pixels
         assert abs(top["cx"] - 1200) <= top["px"] + .01 and abs(top["cy"] - 800) <= top["px"] + .01, top   # at the drop point (a screen pixel is px document pixels)
         time.sleep(0.5); shot(page, "5-editor-library-drop.png")
-        fr.click("#bSave")
+        fr.click("#topr [data-a=save]")
         page.wait_for_function(f"() => board.items['{fid}'].v === 2", timeout=60000); closed(page)
         assert sorted(page.evaluate(f"() => board.items['{fid}'].pics")) == ["pics/big.jpg", "pics/lib.png"]
         doc = json.loads((lib / page.evaluate(f"() => board.items['{fid}'].doc")).read_text())
@@ -302,8 +302,9 @@ def test_old_frame_opens_and_versions_are_pruned(hy):
         page.dblclick(".plg[data-id='f1']")
         fr = editor(page)
         assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).length") == 1 and fr.evaluate("() => __ed.VERSION") == 0
+        assert fr.evaluate("() => __ed.docJSON().background") == "#ffffff"   # a frame saved before keeps its white (new ones are transparent)
         fr.evaluate("() => __ed.canvasSize(600, 500, 0, 0)")
-        fr.click("#bSave")
+        fr.click("#topr [data-a=save]")
         page.wait_for_function("() => board.items.f1.v === 1", timeout=60000); closed(page)
         assert page.evaluate("() => board.items.f1.doc") == "frames/251005-120000-old/frame.1.json"
         assert (d / "frame.json").is_file() and (d / "render.png").is_file() and (d / "render.1.png").is_file()
@@ -335,6 +336,9 @@ def test_hy_frame_commands(hy):
     assert out.returncode == 0 and "«Тест» 1000×450 px из 2" in out.stdout, out.stdout + out.stderr
     b = board(state); fid, card = next((k, it) for k, it in b["items"].items() if it.get("type") == "imgframe")
     assert "a1" not in b["items"] and card["size"] == [1000, 450] and (lib / card["render"]).is_file() and Image.open(lib / card["render"]).size == (1000, 450)
+    # transparent, as the board's frames (owner 2026-10-09: «по дефолту прозрачный должен быть»): nothing between the pictures
+    im = Image.open(lib / card["render"]); doc = json.loads((lib / card["doc"]).read_text())
+    assert im.mode == "RGBA" and im.getpixel((650, 200))[3] == 0 and im.getpixel((300, 200))[3] == 255 and doc["background"] is None and card["alpha"] is True
     rev = b["revision"]
     out = run("do", "frame layers Тест")
     assert out.returncode == 0 and "pic «a» 600×400 @ 0,0 pics/a.png" in out.stdout and board(state)["revision"] == rev, out.stdout + out.stderr
@@ -444,8 +448,11 @@ def test_plugin_speaks_english_by_default(hy):
         page.dblclick(".plg[data-id=h1]")
         page.wait_for_selector(".hfbar")
         bar = page.evaluate("() => { const b = document.querySelector('.hfbar'); return b.innerText + ' ' + [...b.querySelectorAll('[title],[aria-label]')].map(e => (e.title || '') + ' ' + (e.getAttribute('aria-label') || '')).join(' '); }")
-        assert "Phone" in bar and "Done" in bar and "Reload" in bar and not CYR.search(bar), bar
-        page.click(".hfbar [data-a=done]")
+        assert "Phone" in bar and "Done" not in bar and "Reload" not in bar and not CYR.search(bar), bar
+        # Reload, Open in browser and Done stand top right, as in every Studio (Hyimg ui/hy/actions.js, owner 2026-10-09)
+        acts = page.evaluate("() => { const a = document.querySelector('hy-studio-actions'); return a.innerText + ' ' + [...a.querySelectorAll('[title]')].map(e => e.title).join(' '); }")
+        assert "Reload" in acts and "Open in browser" in acts and "Done" in acts and not CYR.search(acts), acts
+        page.click("hy-studio-actions [data-a=done]")
         # the image frame: the right click and the bar over the selection
         page.evaluate("sel = new Set(['a1', 'b1']); render(); fit()"); time.sleep(0.6)
         page.click(".it[data-id=a1]", button="right")
@@ -463,23 +470,23 @@ def test_plugin_speaks_english_by_default(hy):
         fid, card = page.evaluate("() => Object.entries(board.items).find(([k, it]) => it.type === 'imgframe')")
         assert card["name"] == "Frame 1", card
         notes = page.evaluate("() => __notes")
-        assert "Frame: 2 images inside, double-click opens the editor" in notes and not any(CYR.search(n) for n in notes), notes
+        assert "Frame: 2 images inside, double-click opens Image Studio" in notes and not any(CYR.search(n) for n in notes), notes
         badges = page.evaluate(f"() => [...document.querySelectorAll(\".plg[data-id='{fid}'] [title]\")].map(e => e.title).join(' | ')")
         assert "Frame · 1000×450 px" in badges and not CYR.search(badges), badges
         page.evaluate(f"sel = new Set(['{fid}']); render()"); page.wait_for_timeout(300)
         inf = page.locator("#iN").inner_text() + " " + page.locator("#iM").inner_text() + " " + page.locator("#iP").inner_text()
         # the info text is one footnote line since the hint rule (2011daa): «Unframe» lives in the right click now, checked below
-        assert "2 images" in inf and "Double-click or Enter: the editor · the images inside never change" in inf and not CYR.search(inf), inf
+        assert "2 images" in inf and "Double-click or Enter: Image Studio · the images inside never change" in inf and not CYR.search(inf), inf
         assert "Open" in page.locator(".tidy").inner_text()
         page.click(f".plg[data-id='{fid}']", button="right")
         items = page.evaluate("() => [...document.querySelectorAll('#ctx button')].map(b => b.innerText.trim())")
-        assert any(t.startswith("Open frame editor") for t in items) and "Unframe" in items, items
+        assert any(t.startswith("Open in Image Studio") for t in items) and "Unframe" in items, items
         page.keyboard.press("Escape")
         # the editor in place: its frame's title and the crumb
         page.wait_for_timeout(1200)
         page.dblclick(f".plg[data-id='{fid}']")
         editor(page)
-        assert page.evaluate("() => document.querySelector('.ifed iframe').title") == "Frame editor"
+        assert page.evaluate("() => document.querySelector('.ifed iframe').title") == "Image Studio"
         assert "Frame 1" in page.locator("#cIfr").inner_text()
         assert not errors, errors
         browser.close()
@@ -487,9 +494,10 @@ def test_plugin_speaks_english_by_default(hy):
 
 @pytest.mark.parametrize("engine", ["chromium", "webkit"])
 def test_editor_library_inset_and_look(hy, engine):
-    """The library floats over the board, so it never moves the editor's rulers: they stay at the window's edges and only the tool
-    rail and the options bar step out from under it (owner 2026-10-06). The editor's plates follow the board's «Форма» and «Тени» live,
-    and the options bar is a plate sized to its tool, not the window's width."""
+    """The library floats over the board, so it never moves the editor's rulers: they stay at the window's edges and only the dock with
+    the studio's tools and the options riding over it step out from under it (owner 2026-10-06; the tools in the dock since round 11 D3,
+    2026-10-08: the dock stands in the middle between the library and the right column). The editor's plates follow the board's «Форма»
+    and «Тени» live, and the options bar is a plate sized to its tool, not the window's width."""
     if engine == "webkit" and not WEBKIT: pytest.skip("no Playwright WebKit (python3 -m playwright install webkit)")
     from playwright.sync_api import sync_playwright
     port, lib, state = hy
@@ -506,22 +514,32 @@ def test_editor_library_inset_and_look(hy, engine):
         page.wait_for_timeout(1200)
         page.evaluate(f"() => __frames.openEditor('{fid}')")
         fr = editor(page); page.wait_for_timeout(900)
-        box = "() => { const r = s => { const b = document.querySelector(s).getBoundingClientRect(); return [Math.round(b.left), Math.round(b.width)]; }; return { rail: r('#rail'), obar: r('#obar'), view: r('#view') }; }"
+        box = """() => { const r = s => { const b = document.querySelector(s).getBoundingClientRect(); return [Math.round(b.left), Math.round(b.width)]; },
+          d = parent.document.getElementById('dock').getBoundingClientRect();
+          return { rail: getComputedStyle(document.getElementById('rail')).display, obar: r('#obar'), view: r('#view'), dock: [Math.round(d.left), Math.round(d.left + d.width / 2)],
+            mid: Math.round((parseFloat(document.documentElement.style.getPropertyValue('--inset')) + document.getElementById('side').offsetLeft) / 2) }; }"""
         frame = "() => Math.round(document.querySelector('.ifed iframe').getBoundingClientRect().left)"
         a = fr.evaluate(box)
-        assert page.evaluate(frame) == 0 and a["view"] == [0, 1440], a
-        assert a["obar"][1] < 900, a   # sized to the brush's options, not stretched to the right column
+        assert page.evaluate(frame) == 0 and a["view"] == [0, 1440] and a["rail"] == "none", a
+        assert a["obar"][1] < 900 and abs(a["obar"][0] + a["obar"][1] / 2 - a["dock"][1]) <= 1, a   # sized to its tool's options, centred on the dock
+        assert abs(a["dock"][1] - a["mid"]) <= 1, a
         page.evaluate("() => postMessage({ type: 'inset', left: 372 }, location.origin)"); page.wait_for_timeout(700)
         b = fr.evaluate(box)
         assert page.evaluate(frame) == 0 and b["view"] == [0, 1440], b   # the canvas and its rulers stay put
-        assert b["rail"][0] == 372 + 12 and b["obar"][0] == 372 + 12, b
+        assert b["mid"] == a["mid"] + 186 and abs(b["dock"][1] - b["mid"]) <= 1, b
+        # centred on the dock, or a long strip stepped in just enough: never under the library
+        assert 372 + 12 <= b["obar"][0] and (abs(b["obar"][0] + b["obar"][1] / 2 - b["dock"][1]) <= 1 or b["obar"][0] == 372 + 12), b
         page.evaluate("() => postMessage({ type: 'inset', left: 0 }, location.origin)"); page.wait_for_timeout(700)
-        assert fr.evaluate(box)["rail"][0] == 12 + 18, fr.evaluate(box)
-        look = "() => { const c = s => getComputedStyle(document.querySelector(s)); return { root: [document.documentElement.dataset.shape, document.documentElement.dataset.shadow], obar: c('#obar').borderTopLeftRadius, rail: c('#rail').borderTopLeftRadius, side: c('#side').boxShadow, tab: c('.tab').borderTopLeftRadius }; }"
+        c = fr.evaluate(box); assert abs(c["dock"][1] - a["mid"]) <= 1, c
+        look = """() => { const c = s => getComputedStyle(document.querySelector(s));
+          return { root: [document.documentElement.dataset.shape, document.documentElement.dataset.shadow], obar: c('#obar').borderTopLeftRadius,
+            side: c('#side').boxShadow, tab: c('.tab').borderTopLeftRadius }; }"""
+        # no shadow by default since c35b5f3 and the core's SETS.shadow "0" (Hyimg 2026-10-08, «Тени: только панели»): the default is flat, the
+        # board's «Тени» turned on gives the editor's plates their shadow live
         r0 = fr.evaluate(look)
-        assert r0["root"] == ["round", "1"] and r0["obar"] == "999px" and r0["side"] != "none", r0
-        page.evaluate("() => { setPref('shape', 'pro'); setPref('shadow', '0'); applyLook(); }"); page.wait_for_timeout(300)
+        assert r0["root"] == ["round", "0"] and r0["obar"] == "999px" and r0["side"] == "none", r0
+        page.evaluate("() => { setPref('shape', 'pro'); setPref('shadow', '1'); applyLook(); }"); page.wait_for_timeout(300)
         r1 = fr.evaluate(look)
-        assert r1["root"] == ["pro", "0"] and r1["obar"] == "11px" and r1["rail"] == "11px" and r1["tab"] == "8px" and r1["side"] == "none", r1
+        assert r1["root"] == ["pro", "1"] and r1["obar"] == "11px" and r1["tab"] == "8px" and r1["side"] != "none", r1
         assert not errors, errors
         browser.close()

@@ -201,7 +201,10 @@ def test_studio_master_mask_pinned_alpha_paint_save_copy(hy, engine):
         assert fr.evaluate(MASKA, [.25, .5]) == 0 and fr.evaluate(MASKA, [.75, .5]) == 255
         # feather: a soft edge, the card gets the mask's look baked beside it
         fr.evaluate("() => { const n = __ed.root[__ed.root.length - 1]; n.mask.feather = 12; __ed.S.dirty = true; __ed.S.ver++; __ed.refresh(); }")
-        fr.click("#bSave")
+        # a white document (a new frame is transparent since 2026-10-09), so the render shows whether the mask was baked into it
+        fr.evaluate("() => { __ed.S.ids = []; __ed.refresh(); __ed.showPanel('props'); }"); time.sleep(0.3)
+        fr.locator("#pbody .bgsw[style*=\"255, 255, 255\"]").first.click(); time.sleep(0.2)
+        fr.click("#topr [data-a=save]")
         page.wait_for_function(f"() => board.items['{fid}'].v === 2", timeout=60000)
         closed(page)
         it = page.evaluate(f"() => board.items['{fid}']")

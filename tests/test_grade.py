@@ -57,8 +57,9 @@ def test_frame_card_has_the_pictures_opacity(hy, engine):
         fid = page.evaluate("() => Object.keys(board.items).find(k => board.items[k].type === 'imgframe')")
         page.evaluate(f"sel = new Set(['{fid}']); render()"); time.sleep(0.4)
         bar = page.locator(".tidy")
-        assert "Открыть" in bar.inner_text() and bar.locator(".op .hy-slider.sm input[data-op]").count() == 1, bar.inner_html()
-        assert bar.locator(".op b").inner_text() == "100%"
+        # the bar's opacity is the app's standard slider, its word and number inside, since hyimg 09c544f (owner 2026-10-07), not the compact one
+        assert "Открыть" in bar.inner_text() and bar.locator(".op .hy-slider:not(.sm) input[data-op]").count() == 1, bar.inner_html()
+        assert bar.locator(".op .hy-slider-l").inner_text() == "Прозрачность" and bar.locator(".op .hy-slider-v").inner_text() == "100%"
         shot(page, f"grade-1-{engine}-frame-bar-opacity.png")
         # the slider: live on the card, one step to undo when let go
         page.evaluate("() => { const i = document.querySelector('.tidy [data-op]'); i.value = 40; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }")
@@ -217,7 +218,7 @@ def test_main_grade_pinned_on_top(hy, engine):
         preset(fr.locator("#padj"), "Cool Studio")
         fr.wait_for_function("() => __ed.root[__ed.root.length - 2].params.temp === -14", timeout=5000)
         time.sleep(0.6)
-        fr.click("#bSave")
+        fr.click("#topr [data-a=save]")
         page.wait_for_function(f"() => board.items['{fid}'].v === 2", timeout=60000)
         closed(page)
         it = page.evaluate(f"() => board.items['{fid}']")

@@ -67,10 +67,10 @@ def test_chosen_rows_switch_together(hy, engine):
         fr.evaluate("(r) => { __ed.S.ids = [r[0], r[2]]; __ed.refresh(); }", r); settle(fr)
         u0 = fr.evaluate(UNDO)
         click(page, fr, f"#rows .lr[data-id='{r[0]}'] [data-a=lock]"); settle(fr, 700)
-        assert fr.evaluate(LOCKED, r) == [True, False, True, False] and fr.evaluate(UNDO) == u0 + 1
+        assert fr.evaluate(LOCKED, r) == [True, False, True, True] and fr.evaluate(UNDO) == u0 + 1   # the last row is the base layer, locked
         assert fr.evaluate(f"() => document.querySelector(\"#rows .lr[data-id='{r[2]}'] [data-a=lock]\").classList.contains('keep')")
         page.keyboard.press("Meta+z"); settle(fr)
-        assert fr.evaluate(LOCKED, r) == [False] * 4
+        assert fr.evaluate(LOCKED, r) == [False] * 3 + [True]
         assert not errors, errors
         browser.close()
 

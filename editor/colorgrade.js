@@ -976,15 +976,17 @@ void main(){
    Hue/Saturation select had their words against the capsule's edge, this reset outweighed their padding) */
 :where(.hcg) button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer}
 .hcg svg{display:block;flex:none}
-.hcg-top{display:flex;align-items:center;gap:2px;height:44px;padding:0 8px 0 14px;border-bottom:1px solid var(--line);flex:none}
+/* round 12 «A · Line» (owner 2026-10-09, r12/image-raw.html: «реализуй этот дизайн»): the title row with no rule under it, the sections
+   34 px heads in the app's words, a hairline between two (Hyimg ui/hy/block.css), labels without a rule after them, a choice a dark well */
+.hcg-top{display:flex;align-items:center;gap:2px;height:36px;padding:0 6px 0 14px;flex:none}
 .hcg-title{flex:1;font-weight:600;font-size:13px;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hcg-ib{width:28px;height:28px;border-radius:var(--r-ctl,8px);display:grid;place-items:center;color:var(--sub);
+.hcg-ib{width:26px;height:26px;border-radius:var(--r-ctl,8px);display:grid;place-items:center;color:var(--sub);
   transition:background .2s var(--ease),color .2s var(--ease),transform .2s var(--ease)}
 .hcg-ib svg{width:16px;height:16px}
 .hcg-ib:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
 .hcg-ib:active{transform:scale(.92)}
 .hcg-ib.on{background:var(--raise2);color:var(--ink)}
-.hcg-pbtn{height:28px;padding:0 calc(var(--hy-cap-pad,10px) - 2px) 0 var(--hy-cap-pad,10px);border-radius:var(--r-ctl,8px);display:flex;align-items:center;gap:4px;color:var(--sub);
+.hcg-pbtn{height:26px;padding:0 calc(var(--hy-cap-pad,10px) - 2px) 0 var(--hy-cap-pad,10px);border-radius:var(--r-ctl,8px);display:flex;align-items:center;gap:4px;color:var(--sub);
   transition:background .2s var(--ease),color .2s var(--ease)}
 .hcg-pbtn:hover,.hcg-pbtn.on{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
 .hcg-pbtn .hcg-chev{width:11px;height:11px;transform:rotate(90deg)}
@@ -997,16 +999,17 @@ void main(){
 .hcg-menu button{display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 10px;border-radius:var(--r-row,6px);text-align:left;
   transition:background .15s var(--ease)}
 .hcg-menu button:hover{background:var(--raise)}
+.hcg-menu .hcg-msep{height:1px;margin:5px 6px;background:var(--line)} .hcg-menu .hcg-mclear .ck{opacity:.75;color:currentColor}
 .hcg-menu button .ck{width:14px;color:var(--sel);opacity:0;transition:opacity .15s}
 .hcg-menu button.cur .ck{opacity:1}
-.hcg-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--raise2) transparent;padding-bottom:24px}
-.hcg-sec{border-bottom:1px solid var(--line)}
-.hcg-head{display:flex;align-items:center;gap:9px;height:40px;padding:0 10px 0 14px;cursor:pointer;color:var(--sub);
+.hcg-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--raise2) transparent;padding:0 6px 24px}
+.hcg-sec+.hcg-sec{border-top:1px solid var(--hy-pline,var(--line))}
+.hcg-head{display:flex;align-items:center;gap:8px;height:34px;padding:0 4px 0 8px;border-radius:8px;cursor:pointer;color:var(--sub);
   transition:color .2s var(--ease),background .2s var(--ease)}
-.hcg-head:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 2%,transparent)}
+.hcg-head:hover{color:var(--ink);background:var(--hy-hov,color-mix(in srgb,var(--ink) 6%,transparent))}
 .hcg-sec.open>.hcg-head{color:var(--ink)}
 .hcg-head .ic{width:15px;height:15px;opacity:.9}
-.hcg-head .t{flex:1;min-width:0;font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hcg-head .t{flex:1;min-width:0;font-weight:500;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hcg-head .dot{width:5px;height:5px;border-radius:50%;background:var(--sel);opacity:0;transform:scale(.4);transition:opacity .2s var(--ease),transform .25s var(--ease)}
 .hcg-sec.mod .hcg-head .dot{opacity:1;transform:none}
 .hcg-head .rs{width:24px;height:24px;border-radius:var(--r-ctl,6px);display:grid;place-items:center;color:var(--muted);opacity:0;scale:.6;pointer-events:none;
@@ -1022,16 +1025,15 @@ void main(){
 .hcg.byp .hcg-scroll,.hcg.byp .hcg-title,.hcg.byp .hcg-pbtn,.hcg.byp .hcg-rall,.hcg-sec.off>.hcg-body{filter:saturate(0);opacity:.4}
 .hcg-sec.off>.hcg-head>.ic,.hcg-sec.off>.hcg-head>.t{opacity:.45}
 .hcg.byp .hcg-eye{color:var(--ink);background:var(--raise2)}
-.hcg-head .hcg-chev{width:12px;height:12px;color:var(--muted);transition:transform .25s var(--ease)}
+.hcg-head .hcg-chev{width:11px;height:11px;margin:0 2.5px;color:var(--muted);transition:transform .25s var(--ease)}
 .hcg-sec.open>.hcg-head .hcg-chev{transform:rotate(90deg)}
 .hcg-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s var(--ease),filter .32s var(--ease2),opacity .32s var(--ease2)}
 .hcg-sec.open>.hcg-body{grid-template-rows:1fr}
 .hcg-inner{min-height:0;overflow:hidden;opacity:0;transition:opacity .22s var(--ease)}
 .hcg-sec.open .hcg-inner{opacity:1}
-.hcg-pad{padding:2px 14px 14px}
-.hcg-sub{display:flex;align-items:center;gap:8px;margin:12px 0 4px;color:var(--muted);font:600 10.5px Geist,ui-sans-serif,sans-serif;letter-spacing:.06em;text-transform:uppercase}
-.hcg-sub::after{content:"";flex:1;height:1px;background:var(--line)}
-.hcg-sub:first-child{margin-top:6px}
+.hcg-pad{padding:0 6px 10px}
+.hcg-sub{display:flex;align-items:center;gap:8px;margin:8px 0 2px;color:var(--muted);font:600 10px Geist,ui-sans-serif,sans-serif;letter-spacing:.06em;text-transform:uppercase}
+.hcg-sub:first-child{margin-top:2px}
 .hcg-row{padding:2px 0}
 .hcg .hy-slider{--hy-sl-h:28px;font-size:12px}   /* the app's one slider (ui/slider.css) at this panel's row height */
 .hcg .hy-slider-ed{user-select:text;-webkit-user-select:text}
@@ -1042,7 +1044,7 @@ void main(){
 .hcg-seg button{flex:1 1 auto;min-width:0;padding:0 6px;height:24px;border-radius:max(0px,calc(var(--r-ctl,8px) - var(--hy-seg-pad,3px)));color:var(--sub);font-size:11px;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;
   transition:background .2s var(--ease),color .2s var(--ease)}
 .hcg-seg button:hover{color:var(--ink)}
-.hcg-seg button.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12),0 0 0 1px var(--line)}
+.hcg-seg button.on{background:var(--hy-val-on,var(--panel));color:var(--hy-val-ink,var(--ink));box-shadow:var(--hy-thumb-sh,none)}
 .hcg-seg .sw{width:7px;height:7px;border-radius:50%;flex:none}   /* a dot stays a dot when the words are long (Russian) */
 .hcg-seg button.dot{flex:0 0 32px}.hcg-seg button.dot .sw{width:9px;height:9px}   /* a channel by its colour alone, its name in the tooltip */
 .hcg-cv{position:relative;margin:2px 0 4px}
@@ -1233,6 +1235,9 @@ void main(){
       menu.appendChild(b); presetBtns.push([name, b]);
     });
     on(menu, 'pointerleave', () => { if (!menu.contains(document.activeElement)) pvShow(null); });
+    // «Clear all» (owner 2026-10-07): the host clears everything applied to its cards, opts.clearAll (the board: HY.props.clear); not a preset
+    if (opts.clearAll) { const cb = el('button', 'hcg-mclear', svg('reset', 'ck', 2) + `<span>${L('Clear all')}</span>`); cb.setAttribute('role', 'menuitem');
+      on(cb, 'click', () => { closeMenu(); opts.clearAll(); }); menu.append(el('div', 'hcg-msep'), cb); }
     root.appendChild(menu);
     // a closed menu keeps its place (it fades), so its items lose their role: the app's menu keys (ui/menu.js: ↑ ↓ Enter) take only an open one
     const closeMenu = () => { pvEnd(false); menu.classList.remove('open'); pBtn.classList.remove('on'); if (menu.contains(document.activeElement)) document.activeElement.blur(); presetBtns.forEach(([, b]) => b.removeAttribute('role')); };

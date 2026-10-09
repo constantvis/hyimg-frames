@@ -58,7 +58,7 @@ def test_presets_show_on_hover_and_a_click_keeps_one(hy, engine):
         page.mouse.move(*center(page, item(page, "Cool Studio"))); calm(page)
         st = page.evaluate(STATE); assert st["temp"] == -14 and st["contrast"] != 26 and st["item"] is None, st
         # a fast sweep down the whole list and out of it: back to what was there
-        names = page.evaluate("() => [...document.querySelectorAll('#hcgp .hcg-menu button')].map(b => b.dataset.k)")
+        names = page.evaluate("() => [...document.querySelectorAll('#hcgp .hcg-menu button[data-k]')].map(b => b.dataset.k)")   # the presets, not «Clear all»
         for n in names + names[::-1]: page.mouse.move(*center(page, item(page, n)), steps=1)
         page.mouse.move(600, 500, steps=2); calm(page)
         st = page.evaluate(STATE)

@@ -115,8 +115,9 @@ export function registerMask(hy) {
   hy.ctx((ids, id) => {
     const tg = ids.filter(i => maskable(HY.board.items[i]));
     const out = [], src = HY.board.items[id], al = tg.filter(i => canAlpha(HY.board.items[i])), wm = tg.filter(i => HY.board.items[i].mask);
-    if (hy.menuOff && ids.length) {   // both always there, grey with the reason when they do not apply (owner 2026-10-06, HY.menuOff)
-      const no = tg.length ? "" : t("A mask only on images and frames");
+    if (hy.menuOff && ids.length) {   // for pictures and frames only (owner 2026-10-07: the menu by kind); both there, grey with the reason
+      if (!tg.length) return [];
+      const no = "";
       return [{ icon: MASK_SVG, label: t("Mask from alpha"), off: no || (al.length ? "" : t("This file has no transparency")), fn: () => maskFromAlpha(al) },
         { icon: MASK_SVG, label: wm.length > 1 ? t("Clear mask ({n})", { n: wm.length }) : t("Clear mask"), off: no || (wm.length ? "" : t("No mask here")), fn: () => clearMask(wm) }];
     }

@@ -14,7 +14,7 @@ from test_imgframe import hy, shot  # noqa: F401  (hy is the fixture)
 from test_select_tool import open_editor
 
 # names and signs that stay as they are in Russian
-KEEP = re.compile(r"Raw Editor|Hyimg|PSD|PNG|JPE?G|RGB|HSL|LaMa|px|esc|Esc|Enter|Shift|Alt|Option|Cmd|Ctrl|Delete|Backspace|Space|Tab|°")
+KEEP = re.compile(r"Raw Editor|Image Studio|3D Studio|Dev Studio|HTML|Hyimg|PSD|PNG|JPE?G|RGB|HSL|LaMa|px|esc|Esc|Enter|Shift|Alt|Option|Cmd|Ctrl|Delete|Backspace|Space|Tab|°")
 # what the editor shows now: visible words and the tooltips of what is visible, with where they are and whether they are cut; the owner's
 # own names (the layers', the board's and the project's in the crumb) are data, not the interface
 SCAN = r"""(root) => {
@@ -58,13 +58,13 @@ def test_the_image_studio_speaks_russian(hy, theme):
         fr.evaluate("() => __ed.showPanel('chan')"); look("panel-chan")
         fr.evaluate("() => __ed.showPanel('layers')"); look("panel-layers")
         for tool in ("brush", "marquee", "wand", "move", "patch", "pick", "hand", "select"):
-            fr.evaluate(f"() => document.querySelector('#rail [data-tool={tool}]') && document.querySelector('#rail [data-tool={tool}]').click()")
+            fr.evaluate(f"() => __ed.setTool('{tool}')")   # the tools are in the board's dock since round 11 D3 (studiodock.js)
             fr.wait_for_timeout(150); seen.extend(fr.evaluate(SCAN))
         look("tool-select")
         fr.click("#g1 .gm"); look("menu-panels"); page.keyboard.press("Escape")
         fr.evaluate("() => __ed.openActs()"); look("actions"); fr.evaluate("() => __ed.closeActs()")
         fr.click("#bset"); look("settings"); fr.click("#bset")
-        fr.click("#view", position={"x": 700, "y": 800}); page.keyboard.press("Alt+Meta+KeyC")   # Canvas Size…
+        fr.click("#view", position={"x": 700, "y": 300}); page.keyboard.press("Alt+Meta+KeyC")   # Canvas Size… (over the picture: the options ride over the dock)
         fr.wait_for_selector("#dlgw.on", timeout=5000); look("dialog"); page.keyboard.press("Escape")
         fr.evaluate("() => __ed.frameMenu(220, 60)"); look("frame-menu"); page.keyboard.press("Escape")
         seen.extend(page.evaluate(SCAN, "#dock, #crumb"))   # the board's dock and crumb while the studio is open

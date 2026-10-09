@@ -3,7 +3,10 @@
 1. «вот это горизонтально должно быть ... и какая-то анимация, чтобы понятно было, что включили»: the W ↔ H link is the app's horizontal
    link (ui/icons.js linkWH, svg.hy-link); on, its halves close on the bar along the app's curve; Document has the same link between its W
    and H instead of a «Constrain proportions» switch, and it scales the other side;
-2. «бг прозрачный не включается»: Transparent shows the checkerboard over the board, and the saved render keeps its alpha;
+2. «бг прозрачный не включается»: Transparent is chosen in Background and the saved render keeps its alpha; since 2026-10-09
+   («по дефолту прозрачный должен быть») a new frame starts transparent, a frame saved before keeps its background; since the same day
+   («а почему шахматка, когда мы можем полностью прозрачный просто сделать, а шахматку просто в кружке вверху показывать») the canvas
+   draws nothing there, the board shows through, a hairline marks the document's edge, the checkerboard is only in the Transparent swatch;
 3. «нужно по умолчанию выбранный дефолтный»: Adjustments has a normal button and the presets list starts with Neutral, chosen while the
    Raw Editor on top is neutral; each swatch is the preset's own render of one sample; a hover shows it, leaving puts it back, a click is
    one step to undo;
@@ -52,8 +55,8 @@ def test_link_is_horizontal_and_document_uses_it(hy, engine):
     port, lib, state = hy
     with sync_playwright() as p:
         browser, page, fr, errors = start(p, port, engine)
-        # a layer: Transform's link between W and H
-        fr.evaluate("(ids) => { __ed.S.ids = [ids[0]]; __ed.refresh(); __ed.setTab('g1', 'props'); }", fr.evaluate(PIXELS)); settle(fr)
+        # a layer (the upper one: the base layer's Transform is locked): Transform's link between W and H
+        fr.evaluate("(ids) => { __ed.S.ids = [ids[1]]; __ed.refresh(); __ed.setTab('g1', 'props'); }", fr.evaluate(PIXELS)); settle(fr)
         s = link_state(fr, "#pbody .whr .xlk")
         assert s["same"] and s["wide"], s
         assert "cubic-bezier(0.32, 0.72, 0, 1)" in s["ease"] and "0.24s" in s["dur"], s
@@ -91,34 +94,86 @@ def test_link_is_horizontal_and_document_uses_it(hy, engine):
 
 
 @pytest.mark.parametrize("engine", ENGINES)
-def test_transparent_background_shows_the_checkerboard_and_saves_alpha(hy, engine):
+def test_transparent_background_shows_the_board_and_saves_alpha(hy, engine):
     from playwright.sync_api import sync_playwright
     port, lib, state = hy
     with sync_playwright() as p:
         browser, page, fr, errors = start(p, port, engine)
         fid = page.evaluate("() => Object.keys(board.items).find(k => board.items[k].type === 'imgframe')")
-        # the owner's case: the only pictures hidden, Transparent chosen
+        # a new frame is transparent (owner 2026-10-09: «по дефолту прозрачный должен быть»): its document, its first render with alpha
+        # between the pictures, the card that says so and shows the board through (as the studio's Save does)
+        it = board(state)["items"][fid]; W, H = it["size"]
+        assert json.loads((lib / it["doc"]).read_text())["background"] is None and it.get("alpha") is True, it
+        im = Image.open(lib / it["render"]); assert im.mode == "RGBA" and im.getpixel((650, 200))[3] == 0 and im.getpixel((300, 200))[3] == 255
+        assert page.evaluate(f"() => document.querySelector('.plg[data-id={fid}]').classList.contains('see')")
+        # the owner's case: the only pictures hidden; Transparent is the one chosen as it opened, White and back to Transparent
         fr.evaluate(f"() => {{ for (const id of ({PIXELS})()) __ed.byId(id).visible = false; __ed.S.ids = []; __ed.refresh(); }}"); settle(fr)
-        W, H = fr.evaluate("() => [__ed.W, __ed.H]")
-        assert fr.evaluate(PIX, [W / 2, H / 2])[:3] == [255, 255, 255]   # white, as it opened
+        assert fr.evaluate("() => document.querySelector('#pbody .bgsw.tr').classList.contains('on')") and fr.evaluate("() => __ed.docJSON().background") is None
+        fr.locator("#pbody .bgsw[style*=\"255, 255, 255\"]").first.click(); settle(fr)
+        assert fr.evaluate(PIX, [W / 2, H / 2])[:3] == [255, 255, 255] and fr.evaluate("() => __ed.docJSON().background") == "#ffffff"
         fr.locator("#pbody .bgsw.tr").click(); settle(fr)
         assert fr.evaluate("() => document.querySelector('#pbody .bgsw.tr').classList.contains('on')")
-        # the checkerboard's two greys, opaque, over the board's paper
-        a, b = fr.evaluate(PIX, [6, 6]), fr.evaluate(PIX, [W / 2 + 0.5, H / 2 + 0.5])
-        cols = {tuple(fr.evaluate(PIX, [x, y])[:3]) for x in range(2, 60, 3) for y in (2, 12, 22)}
-        assert a[3] == 255 and b[3] == 255, (a, b)
-        assert {(228, 228, 231), (196, 196, 202)} <= cols, cols
+        # nothing drawn: no checkerboard, the board's paper shows through (owner 2026-10-09: «а почему шахматка ...»)
+        assert {fr.evaluate(PIX, [x, y])[3] for x in range(2, 60, 3) for y in (2, 12, 22)} | {fr.evaluate(PIX, [W / 2 + 0.5, H / 2 + 0.5])[3]} == {0}
         for th in ("dark", "light"):
             page.evaluate(f"() => document.documentElement.dataset.theme = '{th}'"); settle(fr, 300)
             shot(page, f"props-transparent-{th}-{engine}.png")
         # saved: the render has its alpha, the card says so
-        fr.click("#bSave")
+        fr.click("#topr [data-a=save]")
         page.wait_for_function(f"() => board.items['{fid}'].v === 2", timeout=60000)
         page.wait_for_function("() => !dirty", timeout=10000)
         it = board(state)["items"][fid]
         im = Image.open(lib / it["render"]); assert im.mode == "RGBA", im.mode
         assert im.getpixel((W // 2, H // 2))[3] == 0 and im.getpixel((3, 3))[3] == 0
         doc = json.loads((lib / it["doc"]).read_text()); assert doc["background"] is None, doc["background"]
+        assert not errors, errors
+        browser.close()
+
+
+@pytest.mark.parametrize("engine", ENGINES)
+def test_new_frame_shows_the_board_behind_no_checkerboard(hy, engine):
+    """owner 2026-10-09: «а почему шахматка, когда мы можем полностью прозрачный просто сделать, а шахматку просто в кружке вверху
+    показывать»: a new frame's empty part shows what is behind it, pixel for pixel; a hairline outside marks its edge; the checkerboard is
+    in the Transparent swatch of Properties › Document › Background"""
+    from playwright.sync_api import sync_playwright
+    port, lib, state = hy
+    with sync_playwright() as p:
+        browser, page, fr, errors = start(p, port, engine)
+        fr.evaluate("() => { __ed.S.ids = []; __ed.refresh(); __ed.showPanel('props'); }"); settle(fr, 600)
+        assert fr.evaluate("() => __ed.docJSON().background") is None
+        # the gap between the two pictures (600..700 of the document) and below the first (y 400..450): nothing on the studio's canvases
+        pts = [(x, y) for x in (610, 650, 690) for y in (20, 200, 430)] + [(100, 430), (300, 440)]
+        assert {fr.evaluate(PIX, list(pt))[3] for pt in pts} == {0}
+        VIEW = """([x, y]) => { const { V } = __ed, k = hyEdK.dpr; return [...hyEdK.view.getContext('2d').getImageData(Math.round((V.x + x * V.s) * k),
+          Math.round((V.y + y * V.s) * k), 1, 1).data]; }"""
+        assert {fr.evaluate(VIEW, list(pt))[3] for pt in pts} == {0}
+        # on screen: the same pixels with the studio and with the studio hidden, so it adds nothing over the board there
+        page.mouse.move(5, 450); settle(fr, 300)
+        xy = [fr.evaluate("([x, y]) => [__ed.V.x + x * __ed.V.s, __ed.V.y + y * __ed.V.s]", list(pt)) for pt in pts]
+        off = page.evaluate("() => { const r = document.querySelector('.ifed iframe').getBoundingClientRect(); return [r.left, r.top]; }")
+        def grab():
+            im = Image.open(io.BytesIO(page.screenshot())).convert("RGB")
+            return [im.getpixel((round(off[0] + x), round(off[1] + y))) for x, y in xy]
+        with_studio = grab()
+        page.evaluate("() => document.querySelector('.ifed iframe').style.visibility = 'hidden'"); settle(fr, 200)
+        behind = grab()
+        page.evaluate("() => document.querySelector('.ifed iframe').style.visibility = ''"); settle(fr, 200)
+        assert all(max(abs(a - b) for a, b in zip(p1, p2)) <= 2 for p1, p2 in zip(with_studio, behind)), (with_studio, behind)
+        assert not any(max(abs(a - b) for a, b in zip(c, g)) <= 8 for c in with_studio for g in ((228, 228, 231), (196, 196, 202))), with_studio
+        # the edge: a hairline just outside the document, in the panels' --line
+        edge = fr.evaluate("""() => { const { V } = __ed, k = hyEdK.dpr, x = (Math.round(V.x) - 1) * k, y = Math.round((V.y + 200 * V.s) * k);
+          return [...hyEdK.view.getContext('2d').getImageData(x, y, 1, 1).data]; }""")
+        assert edge[3] > 0, edge
+        # the checkerboard lives in the Transparent swatch, chosen
+        sw = fr.locator("#pbody .bgsw.tr")
+        assert fr.evaluate("() => document.querySelector('#pbody .bgsw.tr').classList.contains('on')")
+        assert "conic-gradient" in fr.evaluate("() => getComputedStyle(document.querySelector('#pbody .bgsw.tr')).backgroundImage")
+        im = Image.open(io.BytesIO(sw.screenshot())).convert("RGB"); w, h = im.size
+        cols = {im.getpixel((x, y)) for x in range(w // 4, 3 * w // 4) for y in range(h // 4, 3 * h // 4)}
+        assert max(sum(c) for c in cols) - min(sum(c) for c in cols) >= 12, cols   # two tones
+        for th in ("dark", "light"):
+            page.evaluate(f"() => document.documentElement.dataset.theme = '{th}'"); settle(fr, 300)
+            shot(page, f"props-new-frame-transparent-{th}-{engine}.png")
         assert not errors, errors
         browser.close()
 
@@ -185,7 +240,7 @@ def test_fill_and_the_lock_row_are_gone_and_fill_folds_into_opacity(hy, engine):
         ids = fr.evaluate(PIXELS)
         fr.evaluate("(ids) => { __ed.S.ids = [ids[0]]; __ed.refresh(); }", ids); settle(fr)
         g = fr.evaluate("""() => ({ fill: !!document.querySelector('#lFill'), locks: document.querySelectorAll('#lset [data-lock], #lset .lk').length, text: document.querySelector('#lset').innerText,
-          opacity: !!document.querySelector('#lOp'), rows: [...document.querySelectorAll('#rows .lr:not(.main):not(.mmask)')].map(r => !!r.querySelector('[data-a=lock]')) })""")
+          opacity: !!document.querySelector('#lOp'), rows: [...document.querySelectorAll('#rows .lr:not(.main):not(.mmask)')].map(r => !!r.querySelector('[data-a=lock], .bse')) })""")
         assert not g["fill"] and g["locks"] == 0 and g["opacity"] and "Fill" not in g["text"] and "Lock" not in g["text"], g
         assert g["rows"] and all(g["rows"]), g
         for th in ("dark", "light"):
@@ -238,14 +293,14 @@ def test_eye_and_lock_drag_in_layers(hy, engine):
         x, y = center(fr, f"#rows .lr[data-id='{rows[1]}'] [data-a=eye]"); _, y0 = center(fr, f"#rows .lr[data-id='{rows[0]}'] [data-a=eye]")
         page.mouse.move(x, y); page.mouse.down(); page.mouse.move(x, y0, steps=4); page.mouse.up(); settle(fr)
         assert [v for v, _ in fr.evaluate(STATE, rows)] == [True] * 4 and fr.evaluate("() => __ed.S.undo.length") == 1
-        # locks: the first row's lock locks all four in one step; ⌘Z unlocks them
-        x, y = center(fr, f"#rows .lr[data-id='{rows[0]}'] [data-a=lock]"); _, y3 = center(fr, f"#rows .lr[data-id='{rows[3]}'] [data-a=lock]")
+        # locks: the first row's lock locks all four in one step; ⌘Z unlocks them (the bottom one is the base layer: locked for good)
+        x, y = center(fr, f"#rows .lr[data-id='{rows[0]}'] [data-a=lock]"); _, y3 = center(fr, f"#rows .lr[data-id='{rows[3]}'] .bse")
         u0 = fr.evaluate("() => __ed.S.undo.length")
         page.mouse.move(x, y); page.mouse.down(); page.mouse.move(x, y3, steps=6); page.mouse.up(); settle(fr)
         assert [l for _, l in fr.evaluate(STATE, rows)] == [True] * 4 and fr.evaluate("() => __ed.S.undo.length") == u0 + 1
-        assert fr.evaluate(f"(ids) => ids.every(id => document.querySelector(`#rows .lr[data-id='${{id}}'] [data-a=lock]`).classList.contains('keep'))", rows)
+        assert fr.evaluate(f"(ids) => ids.every(id => document.querySelector(`#rows .lr[data-id='${{id}}'] [data-a=lock]`).classList.contains('keep'))", rows[:3])
         page.keyboard.press("Meta+z"); settle(fr)
-        assert [l for _, l in fr.evaluate(STATE, rows)] == [False] * 4
+        assert [l for _, l in fr.evaluate(STATE, rows)] == [False] * 3 + [True]
         # a click alone still switches one row, once
         fr.click(f"#rows .lr[data-id='{rows[2]}'] [data-a=eye]"); settle(fr)
         assert [v for v, _ in fr.evaluate(STATE, rows)] == [True, True, False, True]
@@ -272,7 +327,7 @@ def test_lock_drag_past_the_bottom_scrolls_the_layers(hy, engine):
         assert [l for _, l in fr.evaluate(STATE, rows)] == [True] * 24
         assert fr.evaluate("() => __ed.S.undo.length") == 1
         page.keyboard.press("Meta+z"); settle(fr)
-        assert [l for _, l in fr.evaluate(STATE, rows)] == [False] * 24
+        assert [l for _, l in fr.evaluate(STATE, rows)] == [False] * 23 + [True]   # the base layer stays locked
         assert not errors, errors
         browser.close()
 

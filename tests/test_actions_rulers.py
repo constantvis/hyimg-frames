@@ -43,3 +43,46 @@ def test_actions_stand_over_the_dock_with_one_height_and_rulers_move_nothing(hy,
             assert after == before, (was, before, after)
         assert not errors, errors
         browser.close()
+
+
+RULER = """() => { const c = document.getElementById('view'), g = c.getContext('2d'), k = c.width / innerWidth, H = innerHeight;
+  const a = (x, y) => g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data[3];
+  return { on: __ed.S.rulers, top: a(6, 2), row: a(6, 31), mid: a(6, H / 2), corner: a(6, H - 6), bottom: a(innerWidth / 2, H - 4), kept: localStorage.getItem('hy-ed-rulers') }; }"""
+
+
+def test_rulers_are_off_by_default_run_to_the_top_and_are_kept(hy):
+    """The owner (2026-10-09, the board with Image Studio open, the ruler cut under the top row): «опять проблема с тем, что до самого
+    верху должна идти линейка, и по дефолту выключена быть». The rulers are off when the studio first opens; ⌘R shows them, the vertical one
+    from the window's very top down to the corner where it meets the bottom one; this viewer keeps the choice through closing and opening
+    the studio again; a closed studio leaves nothing of them over the board. Chromium, dark."""
+    from playwright.sync_api import sync_playwright
+    from test_imgframe import closed, editor
+    port, lib, state = hy
+    with sync_playwright() as p:
+        browser, page, fr, errors = open_editor(p, port, "chromium")
+        fr.wait_for_function("() => document.body.classList.contains('in')", timeout=10000); fr.wait_for_timeout(600)
+        r = fr.evaluate(RULER)
+        assert not r["on"] and r["top"] == r["mid"] == r["corner"] == r["bottom"] == 0 and r["kept"] is None, r
+        # ⌘R, as the studio's View menu says: both rulers, the vertical one up to the window's top (it began under the row, 59c21fd)
+        fr.evaluate("() => window.focus()"); page.keyboard.press("Meta+KeyR"); fr.wait_for_timeout(450)
+        r = fr.evaluate(RULER)
+        assert r["on"] and r["kept"] == "1" and min(r["top"], r["row"], r["mid"], r["corner"], r["bottom"]) > 0, r
+        # a guide is pulled from the ruler's top part too
+        assert fr.evaluate("() => __ed.TOPY") > 30
+        # closed: nothing of the studio, its rulers included, over the board
+        fid = page.evaluate("() => Object.keys(board.items).find(k => board.items[k].type === 'imgframe')")
+        page.keyboard.press("Escape"); closed(page)
+        assert page.evaluate("() => getComputedStyle(document.querySelector('.ifed')).visibility") == "hidden"
+        hit = page.evaluate("() => { const e = document.elementFromPoint(6, innerHeight / 2); return e ? (e.closest('.ifed') ? 'studio' : e.tagName) : null; }")
+        assert hit != "studio", hit
+        # opened again (the page loads afresh after each exit): the rulers as this viewer left them; off again, kept off
+        page.evaluate(f"() => __frames.openEditor('{fid}')"); fr = editor(page)
+        fr.wait_for_function("() => document.body.classList.contains('in')", timeout=10000); fr.wait_for_timeout(600)
+        r = fr.evaluate(RULER); assert r["on"] and r["top"] > 0, r
+        fr.evaluate("() => __ed.toggleRulers()"); fr.wait_for_timeout(300)
+        page.keyboard.press("Escape"); closed(page)
+        page.evaluate(f"() => __frames.openEditor('{fid}')"); fr = editor(page)
+        fr.wait_for_function("() => document.body.classList.contains('in')", timeout=10000); fr.wait_for_timeout(600)
+        r = fr.evaluate(RULER); assert not r["on"] and r["kept"] == "0" and r["top"] == r["mid"] == 0, r
+        assert not errors, errors
+        browser.close()
