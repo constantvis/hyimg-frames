@@ -63,7 +63,7 @@ def test_the_image_studio_speaks_russian(hy, theme):
         look("tool-select")
         fr.click("#g1 .gm"); look("menu-panels"); page.keyboard.press("Escape")
         fr.evaluate("() => __ed.openActs()"); look("actions"); fr.evaluate("() => __ed.closeActs()")
-        fr.click("#bset"); look("settings"); fr.click("#bset")
+        assert fr.evaluate("() => !document.getElementById('bset').getClientRects().length")   # no gear in a Studio (owner 2026-10-09)
         fr.click("#view", position={"x": 700, "y": 300}); page.keyboard.press("Alt+Meta+KeyC")   # Canvas Size… (over the picture: the options ride over the dock)
         fr.wait_for_selector("#dlgw.on", timeout=5000); look("dialog"); page.keyboard.press("Escape")
         fr.evaluate("() => __ed.frameMenu(220, 60)"); look("frame-menu"); page.keyboard.press("Escape")

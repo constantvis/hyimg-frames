@@ -1,4 +1,4 @@
-# Hyimg-frames
+# Hyimg Image Studio
 
 [English](README.md)
 
@@ -17,7 +17,7 @@ Image Studio со слоем Raw Editor прямо на доске, ниже к�
 cd hyimg && ./scripts/install_plugins.sh --frames          # --lama дополнительно скачает модель заливки
 ```
 
-Вручную: склонировать репозиторий и сделать ссылку `ln -s <путь к hyimg-frames> ~/Library/Application\ Support/Hyimg/plugins/frames`, потом перезапустить сервер Hyimg (⇧⌘R).
+Вручную: склонировать репозиторий и сделать ссылку `ln -s <путь к hyimg-image-studio> ~/Library/Application\ Support/Hyimg/plugins/frames`, потом перезапустить сервер Hyimg (⇧⌘R).
 
 Что нужно:
 

@@ -1,6 +1,6 @@
 """The grading switched off, as a whole and by section (owner 2026-10-06: the split button said nothing, «it is not clear at all» that
 the grade is off). The header's eye switches the whole grade off: the panel under the header fades (a saturate(0) filter and less
-opacity, the eye and ✕ stay), the card shows its picture as it is, its mark turns into the plain wheel, dimmed. Each section has its own
+opacity, the eye and ✕ stay), the card shows its picture as it is, its mark turns into the outlined circles, dimmed. Each section has its own
 eye by its chevron: off, only that section leaves the picture, its values stay, the section fades. Both are changes of the grade: one
 step to undo, saved with it, carried by «Copy properties ›» / «Paste properties ›», read back after a reload; a grade saved before has
 neither flag and is on. A section's reset ↺ shows on its header's hover and resets only that section, one step. Chromium and WebKit.
@@ -40,11 +40,11 @@ def test_eyes_and_section_reset(hy, engine):
         browser, page, errors = open_board(p, port, engine)
         page.evaluate(f"() => {{ const b = snap(); board.items.a1.grade = {GRADE}; commit(b); }}")
         page.wait_for_function(GRADED); page.wait_for_function("() => !!document.querySelector('#items [data-id=a1] > canvas.grd')")
-        # a working grade: the «on» wheel on the card and on the bar (the hue wedges), not the plain line
+        # a working grade: the «on» icon on the card and on the bar, its 3 RGB circles filled (core 4039dfc), not outlined
         assert mark_shown(page, "a1")
-        assert page.evaluate("() => document.querySelectorAll('#items [data-id=a1] > .mk-grade svg path').length") >= 60
+        assert page.evaluate("""() => document.querySelectorAll('#items [data-id=a1] > .mk-grade svg circle[fill]').length""") == 3
         open_panel(page)
-        assert page.evaluate("""() => document.querySelectorAll('.tidy button.ic[aria-label="Raw Editor"] svg path').length""") >= 60
+        assert page.evaluate("""() => document.querySelectorAll('.tidy button.ic[aria-label="Raw Editor"] svg circle[fill]').length""") == 3
         hcg, eye = page.locator("#hcgp .hcg"), page.locator("#hcgp .hcg-eye")
         assert eye.get_attribute("aria-pressed") == "false" and "Выключить" in eye.get_attribute("title") and not eye.get_attribute("title").endswith(".")
         for th in ("dark", "light"):
@@ -60,7 +60,8 @@ def test_eyes_and_section_reset(hy, engine):
         assert page.evaluate(FADED, "#hcgp .hcg-eye")["o"] == 1 and page.evaluate(FADED, "#hcgp .hcgx")["o"] == 1
         assert eye.get_attribute("aria-pressed") == "true" and "Включить" in eye.get_attribute("title")
         page.wait_for_function("() => !document.querySelector('#items [data-id=a1] > canvas.grd')", timeout=3000)
-        assert page.evaluate("() => { const m = document.querySelector('#items [data-id=a1] > .mk-grade'); return m.classList.contains('idle') && m.querySelectorAll('svg path').length === 0; }")
+        assert page.evaluate("""() => { const m = document.querySelector('#items [data-id=a1] > .mk-grade');
+          return m.classList.contains('idle') && m.querySelectorAll('svg circle[fill]').length === 0; }""")
         for th in ("dark", "light"):
             page.evaluate(f"() => {{ document.documentElement.dataset.theme = '{th}'; }}"); time.sleep(0.45)
             shot(page, f"eyes-2-{engine}-all-off-{th}.png")
@@ -136,7 +137,7 @@ def test_eyes_and_section_reset(hy, engine):
 
 @pytest.mark.parametrize("engine", ENGINES)
 def test_a_grade_saved_before_is_on(hy, engine):
-    """a grade written before the eyes (no bypass, no off) is on: the card graded, the mark the «on» wheel, the panel at full strength"""
+    """a grade written before the eyes (no bypass, no off) is on: the card graded, the mark the «on» icon, the panel at full strength"""
     if engine == "webkit" and not WEBKIT: pytest.skip("no Playwright WebKit")
     from playwright.sync_api import sync_playwright
     port, lib, state = hy

@@ -100,10 +100,10 @@ def test_double_click_on_a_picture_opens_the_image_mode(hy, engine):
         page.keyboard.press("Meta+Shift+z")
         page.wait_for_function("() => board.items.a1.type === 'imgframe' && board.items.a1.v === 1")
         page.wait_for_function("() => document.querySelector('.plg[data-id=a1] img.ifr') && !document.querySelector('.it[data-id=a1]')")
-        # the crop is on the bar over a selected picture, with its key in the tooltip
+        # the crop is on the bar over a selected picture, with its key in the tooltip: ⇧C, C is Annotation (hyimg 782b0c8)
         page.evaluate("() => { sel = new Set(['b1']); render(); }"); page.wait_for_timeout(350)
         b = page.locator(".tidy > button[data-crop]")
-        assert b.count() == 1 and b.get_attribute("title") == "Кадрировать · C" and b.locator("> kbd").inner_text() == "C"
+        assert b.count() == 1 and b.get_attribute("title") == "Кадрировать · ⇧C" and b.locator("> kbd").inner_text() == "⇧C"
         b.click()
         page.wait_for_function("() => cropState && cropState.id === 'b1'")
         page.keyboard.press("Escape"); page.wait_for_function("() => !cropState")

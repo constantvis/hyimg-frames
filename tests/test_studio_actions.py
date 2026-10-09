@@ -1,7 +1,7 @@
 """Image Studio's Cancel and Save top right through Hyimg's one element for a Studio's session actions (ui/hy/actions.js; owner 2026-10-09:
 «кнопки Done у нас всегда стандартизированы справа вверху ... Их тоже нужно систематизировать, чтобы они везде были идентичны»), the same
 as in 3D Studio and Dev Studio: Cancel, then Save in the studio's purple with white words and a check, on the top row's line and height,
-the row's gap left of the studio's gear; the tooltips the page's own (data-tip, the key in data-key); neither in the board's dock. The HTML
+at its gutter (no round buttons in a Studio, the gear neither); the tooltips the page's own (data-tip, the key in data-key); neither in the board's dock. The HTML
 frame's live view has Reload, Open in browser and Done there too, not in its dock. Chromium, dark."""
 from test_imgframe import closed, hy  # noqa: F401  (hy is the fixture)
 from test_studio_dock import open_studio
@@ -20,9 +20,12 @@ def test_image_studio_actions_top_right(hy):
             ["hy-studio-actions", "cancel", "save"]
         # neither in the board's dock
         assert page.evaluate("() => document.querySelectorAll('#dock [data-a=save], #dock [data-a=cancel]').length") == 0
-        # the row's line and height, the row's gap left of the gear
-        acts, gear = fr.evaluate(BOX, "#topr"), fr.evaluate(BOX, "#bset")
-        assert acts[1] == gear[1] == 12 and acts[3] == 38 and acts[2] == gear[0] - 8, (acts, gear)
+        # the row's line and height, at the row's gutter: in a Studio the round buttons are away, Image Studio's gear and the board's
+        # (owner 2026-10-09 on round 14's 3D Studio: «В режиме студии мы вот эти все элементы убираем»)
+        acts, width = fr.evaluate(BOX, "#topr"), fr.evaluate("() => innerWidth")
+        assert acts[1] == 12 and acts[3] == 38 and acts[2] == width - 12, (acts, width)
+        assert fr.evaluate("() => !document.getElementById('bset').getClientRects().length")
+        assert page.evaluate("() => ['#bntf', '#bkeys', '#bhist', '#bset'].every(q => !document.querySelector(q).getClientRects().length)")
         # Save: the purple, white words, a check, its key in the page's tooltip and on its key cap; Cancel on the row's glass
         purple = fr.evaluate(PROBE, "var(--frame)")
         save = fr.evaluate("() => { const b = document.querySelector('#topr [data-a=save]'), c = getComputedStyle(b); "

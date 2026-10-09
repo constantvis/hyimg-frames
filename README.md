@@ -1,4 +1,4 @@
-# Hyimg Frames
+# Hyimg Image Studio
 
 A plugin for [Hyimg](https://github.com/constantvis/Hyimg), the local Figma + Lightroom + Miro for working with AI agents. It adds two kinds of frames to the board: an image frame that opens in Image Studio, and an HTML frame that shows a live web page as a card. [Русская версия](README.ru.md).
 
@@ -36,7 +36,7 @@ Put a page in the project folder at `html/<name>/index.html`. At rest the card s
 cd hyimg && ./scripts/install_plugins.sh --frames    # add --lama to download the fill model too
 ```
 
-Or by hand: clone this repository and run `ln -s <path to hyimg-frames> ~/Library/Application\ Support/Hyimg/plugins/frames`, then View › Restart server (⇧⌘R) in Hyimg.
+Or by hand: clone this repository and run `ln -s <path to hyimg-image-studio> ~/Library/Application\ Support/Hyimg/plugins/frames`, then View › Restart server (⇧⌘R) in Hyimg.
 
 What it needs:
 

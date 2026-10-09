@@ -9,10 +9,9 @@
 // The page lives in the library (html/ is not shown as library frames) and is served by path (/lib/...), so its css, scripts and
 // pictures load by relative links.
 import { register as registerImageFrame } from "./imgframe.js";   // the image frame with its editor (owner 2026-10-05), its own module
-import { translator, lang } from "./lang.js";   // English or Russian, as the board is set (owner 2026-10-06)
+import { translator } from "./lang.js";   // English or Russian, as the board is set (owner 2026-10-06)
 
 const TYPE = "htmlframe";
-const ICON = window.hyIcon ? window.hyIcon("htmlFrame", 18, 1.8) : "";   // an HTML frame (ui/icons.js)
 const PRESETS = [["Phone", 390, 844], ["Tablet", 834, 1194], ["Laptop", 1280, 800], ["Desktop", 1440, 900]];   // names through t()
 const enc = encodeURIComponent, libUrl = p => "/lib/" + p.split("/").map(enc).join("/");
 let HY, t = k => k;
@@ -133,20 +132,6 @@ function dockBar() {
   b.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") e.target.blur(); });
   return b;
 }
-// a new frame: a starter page in html/<date>/index.html, live at once
-async function newFrame() {
-  const d = new Date(), z = n => String(n).padStart(2, "0"), stamp = `${String(d.getFullYear()).slice(2)}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
-  const src = `html/${stamp}/index.html`;
-  // the starter page speaks the interface's language (owner 2026-10-06)
-  const page = `<!doctype html><html lang="${lang(HY)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${t("Frame {stamp}", { stamp })}</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.5 -apple-system,system-ui,sans-serif;background:#f4f3ef;color:#1d1d1f}main{max-width:40ch;padding:24px}h1{font-size:28px;margin:0 0 8px}</style>
-</head><body><main><h1>${t("New frame")}</h1><p>${t("File {src} in the project folder. An agent or you write it, the canvas shows it live on a double-click.", { src })}</p></main></body></html>`;
-  const r = await fetch(`/api/file?p=${enc(src)}`, { method: "POST", body: page }); if (!r.ok) return HY.toast(t("Frame not created: {e}", { e: await r.text() }), "error");
-  const c = HY.viewCenter(), w = 720, before = HY.snap(), id = HY.uid("h");
-  HY.board.items[id] = { type: TYPE, src, vw: 1440, x: Math.round(c.x - w / 2), y: Math.round(c.y - 225), w, h: 450 };
-  HY.commit(before, t("HTML frame")); HY.select([id]); setTimeout(() => goLive(id), 50);
-}
-
 export function register(hy) {
   HY = hy; t = translator(hy);
   const st = document.createElement("style"); st.textContent = `
@@ -193,6 +178,7 @@ export function register(hy) {
     return it && it.type === TYPE && claimed() && L.id !== ids[0] ? [{ first: true, icon: window.hyIcon ? window.hyIcon("htmlFrame", 15, 1.9) : "", label: t("Live view"),
       title: t("The live page: device sizes, the frame's edges resize it"), fn: () => goLive(ids[0]) }] : [];
   });
-  hy.addButton(ICON, t("HTML frame: a live page on the canvas, double-click to scroll and click"), newFrame);
+  // no dock button to make a new frame (owner 2026-10-09: «Также создавать фрейм я не вижу смысла. Зачем вообще эта кнопка?»): agents
+  // place frames with hy.py do 'htmlframe …', the frames already on a board work as before
   registerImageFrame(hy);
 }

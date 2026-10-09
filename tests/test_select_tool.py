@@ -54,7 +54,13 @@ def test_select_tool_icons_keys_radius_and_splitter(hy, engine):
         px = fr.evaluate(PIXELS); assert len(px) >= 2, px
         off = page.evaluate("() => { const w = document.querySelector('.ifed').getBoundingClientRect(); return [w.left, w.top]; }")
         V = fr.evaluate("() => ({ x: __ed.V.x, y: __ed.V.y, s: __ed.V.s })")
-        at = lambda n: (off[0] + V["x"] + (n["x"] + n["w"] / 2) * V["s"], off[1] + V["y"] + (n["y"] + n["h"] / 2) * V["s"])   # noqa: E731
+        # a point of the layer the canvas shows: the studio opens in place over the board, so a layer may lie partly under the right column
+        free = "([x, y]) => { const e = document.elementFromPoint(x, y); return !!e && e.id === 'view'; }"
+        def at(n):
+            for f in (.5, .3, .15, .7, .85):
+                x, y = V["x"] + (n["x"] + n["w"] * f) * V["s"], V["y"] + (n["y"] + n["h"] / 2) * V["s"]
+                if fr.evaluate(free, [x, y]): return off[0] + x, off[1] + y
+            raise AssertionError(f"layer {n['id']} is hidden under the panels")
         fr.evaluate("() => { __ed.S.ids = []; }")
         page.mouse.click(*at(px[0])); page.wait_for_timeout(200)
         ids = fr.evaluate("() => __ed.S.ids"); assert len(ids) == 1, ids

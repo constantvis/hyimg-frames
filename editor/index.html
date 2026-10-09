@@ -591,9 +591,9 @@ body.nokeys #tip .kc{display:none}
 :root.board #rail{translate:calc(-100% - 60px) 0;opacity:0;transition:translate .46s var(--ease),opacity .32s var(--ease),left .3s var(--ease),top .3s var(--ease)}
 :root.board #side{translate:calc(100% + 40px) 0;opacity:0;transition:translate .46s var(--ease),opacity .32s var(--ease),transform .32s var(--ease)}
 :root.board #obar{translate:0 -10px;opacity:0;transition:translate .4s var(--ease),opacity .3s var(--ease),top .3s var(--ease),left .3s var(--ease),right .3s var(--ease)}
-:root.board :is(#topr,#bset){opacity:0;transition:opacity .3s var(--ease)}
+:root.board #topr{opacity:0;transition:opacity .3s var(--ease)}:root.board :is(#bset,#sets){display:none!important}   /* a Studio: no round buttons (owner 2026-10-09) */
 :root.board body.in :is(#rail,#side,#obar){translate:0 0;opacity:1}
-:root.board body.in :is(#topr,#bset){opacity:1}
+:root.board body.in #topr{opacity:1}
 :root.board body.in #side.gone{opacity:0}
 :root.board #view{transition:opacity .34s var(--ease)}
 :root.board body.out #view{opacity:0}
@@ -719,6 +719,7 @@ const T = hyEdTr({   // in the board's language (i18n.js, the words in lang.js)
   // top line
   home: 'Home', whereAmI: 'Where you are', library: 'Library', libHint: '<b>Drag</b> onto the canvas or <b>click</b> to add a layer',
   saveTip: 'Render the frame onto the board and close', cancelTip: 'Close without saving', settings: 'Settings', closedNoSave: 'Closed without saving',
+  studioActs: 'Studio actions',
   rename: 'Rename', docSize: 'Document Size', reveal: 'Reveal on Board', wouldOpen: w => `Opens ${w}`,
   saveQ: n => `Save changes to "${n}"?`, saveQNote: 'Your changes are lost if you leave without saving.', dontSave: "Don't Save",
   discardQ: 'Close without saving?', discardNote: 'The changes made since the last save will be lost.', discard: 'Discard',
@@ -3385,6 +3386,7 @@ $('#libp .lhd b').textContent = T.library; $('#libp .lhd .note').innerHTML = T.l
 // «кнопки Done у нас всегда стандартизированы справа вверху ... чтобы они везде были идентичны»); the keys stay Esc and ⌘↵
 $('#topr').actions = [{ id: 'cancel', label: T.cancel, tip: T.cancelTip, key: 'Esc', run: () => cancelFrame() },
   { id: 'save', label: T.save, tip: T.saveTip, key: '⌘ ↵', primary: true, run: () => saveFrame() }];
+$('#topr').setAttribute('aria-label', T.studioActs);   // the element's own label asks the page's T, a table here, not the board's words
 const bset = $('#bset');
 bset.innerHTML = svg('gear', 18, 1.8); bset.dataset.tip = T.settings; bset.dataset.side = 'left'; bset.setAttribute('aria-label', T.settings);
 function closeEditor() { if (BM) exitBoard(); else if (HOST) HOST.close(); else toast(T.closedNoSave, 'x'); }

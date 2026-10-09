@@ -428,7 +428,7 @@ CYR = re.compile(r"[А-Яа-яЁё]")
 @pytest.mark.parametrize("hy", ["en"], indirect=True)
 def test_plugin_speaks_english_by_default(hy):
     """The interface in English (owner 2026-10-06: «make 2 versions, Russian and English, switchable in settings», English the default):
-    without cv.lang in the app's settings everything this plugin puts on the board is English: the HTML frame's dock button, its live
+    without cv.lang in the app's settings everything this plugin puts on the board is English: the HTML frame's live
     bar and its info card; the image frame's right-click items, the bar over the selection, the card's badges and info, the undo notes,
     the crumb and the editor's frame. Scoped to the plugin's own elements: the board's own words are another module's."""
     from playwright.sync_api import sync_playwright
@@ -438,10 +438,11 @@ def test_plugin_speaks_english_by_default(hy):
         browser, page, errors = open_board(p, port)
         assert page.evaluate("() => HY.lang") == "en"
         page.evaluate("() => { window.__notes = []; const c = window.commit; window.commit = (b, n) => { if (n) __notes.push(n); return c(b, n); }; }")
-        # the HTML frame: the dock button, the info card, the live bar
-        tip = page.locator("#dock button[title^='HTML frame']").get_attribute("title")
-        assert tip.startswith("HTML frame:") and not CYR.search(tip), tip
+        # the HTML frame: no dock button any more (owner 2026-10-09: «Зачем вообще эта кнопка?»), the info card, the live bar
+        page.wait_for_function("() => typeof PLG !== 'undefined' && PLG.htmlframe")
+        assert page.locator("#dock button[title^='HTML frame']").count() == 0
         page.evaluate("() => { const b = snap(); board.items.h1 = { type: 'htmlframe', src: 'html/demo/index.html', vw: 1440, x: 0, y: 1400, w: 720, h: 450 }; commit(b); sel = new Set(['h1']); render(); }")
+        page.evaluate("() => fit()")   # in view: a selection out of the window takes its Info card with it (hyimg ui/bars.js, 2026-10-08)
         page.wait_for_timeout(300)
         info = page.locator("#info").inner_text()
         assert "HTML frame" in info and "Double-click" in info and not CYR.search(page.locator("#iN").inner_text() + page.locator("#iM").inner_text() + page.locator("#iP").inner_text()), info
@@ -540,6 +541,8 @@ def test_editor_library_inset_and_look(hy, engine):
         assert r0["root"] == ["round", "0"] and r0["obar"] == "999px" and r0["side"] == "none", r0
         page.evaluate("() => { setPref('shape', 'pro'); setPref('shadow', '1'); applyLook(); }"); page.wait_for_timeout(300)
         r1 = fr.evaluate(look)
-        assert r1["root"] == ["pro", "1"] and r1["obar"] == "11px" and r1["tab"] == "8px" and r1["side"] != "none", r1
+        assert r1["root"] == ["pro", "1"] and r1["obar"] == "11px" and r1["side"] != "none", r1
+        # the tabs are the block header's (.hy-bh-tab): the core's --hy-tab-r, 7 px in both shapes (hyimg ui/tokens.css, round 12 «A · Line»)
+        assert r0["tab"] == r1["tab"] == "7px", (r0, r1)
         assert not errors, errors
         browser.close()
