@@ -2104,7 +2104,7 @@ const MB = [
     { icon: 'fit', label: T.fitScreen, keys: ['⌘', '0'], fn: () => fit(true) },
     { icon: 'one', label: '100%', keys: ['⌘', '1'], fn: () => zoomTo(1) }, null,
     { check: S.extras, label: T.extras, keys: ['⌘', 'H'], fn: toggleExtras },
-    { check: S.rulers, label: T.rulers, keys: ['⌘', 'R'], fn: toggleRulers },
+    { check: S.rulers, label: T.rulers, keys: ['⇧', 'R'], fn: toggleRulers },
     { check: S.grid, label: T.grid, fn: () => { S.grid = !S.grid; S.odirty = true; } }, null,
     { check: S.showGuides, label: T.showGuides, keys: ['⌘', ';'], fn: () => { S.showGuides = !S.showGuides; S.odirty = true; } },
     { check: S.lockGuides, label: T.lockGuides, keys: ['⌥', '⌘', ';'], fn: () => { S.lockGuides = !S.lockGuides; } },
@@ -2129,7 +2129,7 @@ function syncMenus() { if (actsOpen()) renderActs(); }
 function toggleExtras() { S.extras = !S.extras; S.odirty = true; S.mbKey = ''; toast(S.extras ? T.extrasOn : T.extrasOff, 'guideN'); }
 // the browser on macOS may take ⌘H to hide the app before the page sees it, so catch it early, and ⌃H works as a fallback
 addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.code === 'KeyH' && !(e.target.closest && e.target.closest('input, textarea'))) { e.preventDefault(); e.stopImmediatePropagation(); toggleExtras(); } }, true);
-// the rulers are off until the person turns them on (owner 2026-10-09: «по дефолту выключена быть»), then this viewer keeps them (⌘R, View)
+// the rulers are off until the person turns them on (owner 2026-10-09: «по дефолту выключена быть»), then this viewer keeps them (⇧R, View)
 const rulersKept = () => { try { return localStorage.getItem('hy-ed-rulers') === '1'; } catch (e) { return false; } };
 function toggleRulers() {
   S.rulers = !S.rulers; document.body.classList.toggle('rul', S.rulers); S.odirty = true;
@@ -3789,7 +3789,7 @@ addEventListener('keydown', e => {
   if (meta && BM && (k === 'Period' || e.key === '.')) { e.preventDefault(); HOST.toggleLib(); return; }
   if (meta) {
     const map = {
-      KeyT: () => startFT(), KeyR: toggleRulers, Semicolon: () => { if (e.altKey) S.lockGuides = !S.lockGuides; else if (e.shiftKey) S.snap = !S.snap; else S.showGuides = !S.showGuides; S.odirty = true; toast(e.altKey ? (S.lockGuides ? T.guidesLocked : T.guidesUnlocked) : e.shiftKey ? (S.snap ? T.snapOn : T.snapOff) : (S.showGuides ? T.guidesShown : T.guidesHidden), 'guideN'); },
+      KeyT: () => startFT(), Semicolon: () => { if (e.altKey) S.lockGuides = !S.lockGuides; else if (e.shiftKey) S.snap = !S.snap; else S.showGuides = !S.showGuides; S.odirty = true; toast(e.altKey ? (S.lockGuides ? T.guidesLocked : T.guidesUnlocked) : e.shiftKey ? (S.snap ? T.snapOn : T.snapOff) : (S.showGuides ? T.guidesShown : T.guidesHidden), 'guideN'); },
       KeyZ: () => e.shiftKey ? redo() : undo(), KeyY: redo, KeyD: () => e.shiftKey ? K.reselect() : deselect(), KeyE: () => e.shiftKey ? mergeVisible() : mergeDown(),
       KeyG: () => e.altKey ? toggleClip() : e.shiftKey ? ungroup() : groupSel(), KeyJ: () => e.shiftKey ? K.layerViaCut() : copyToLayer(), KeyA: () => e.shiftKey ? deselect() : selectAll(),
       KeyI: () => e.altKey ? sizeDialog('image') : e.shiftKey ? invertSel() : K.invert(), KeyC: () => e.altKey ? sizeDialog('canvas') : null, KeyN: () => e.shiftKey ? newLayer() : null,
@@ -3801,6 +3801,8 @@ addEventListener('keydown', e => {
   if (e.shiftKey && k === 'F5') { e.preventDefault(); fillSelection(); return; }
   if (e.shiftKey && k === 'F6') { e.preventDefault(); featherDialog(); return; }
   if (e.altKey) return;
+  // ⇧R the rulers, as Figma (owner 2026-10-10: ⌘R was Photoshop's and kept a browser tab from reloading, «давай придумаем другую комбинацию»)
+  if (e.shiftKey && k === 'KeyR') { e.preventDefault(); toggleRulers(); return; }
   if (k === 'Space') { e.preventDefault(); if (!S.space) { S.space = true; updCursor(); } return; }
   { const cands = TOOLS.filter(x => x.code === k);
     if (cands.length) { if (e.shiftKey) { const i = cands.findIndex(c => c.id === S.tool); setTool(cands[(i < 0 ? 1 : i + 1) % cands.length].id); } else setTool(S.tool !== cands[0].id && cands.some(c => c.id === S.tool) ? S.tool : cands[0].id); return; } }
