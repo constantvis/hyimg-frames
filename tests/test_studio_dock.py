@@ -20,7 +20,8 @@ FLY = "() => { const f = document.querySelector('.ifly.show'); return f ? [...f.
 
 def open_studio(p, port):
     browser = p.chromium.launch()
-    page = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="dark")
+    # 1600 wide: the dock (with Undo and Redo since 2026-10-10, about 770 px) fits between the library and the right column
+    page = browser.new_page(viewport={"width": 1600, "height": 900}, color_scheme="dark")
     errors = []; page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(f"http://127.0.0.1:{port}/canvas.html")
     page.wait_for_function("() => typeof PLGST !== 'undefined' && PLGST.some(p => p.name === 'frames' && p.ok)", timeout=20000)
@@ -150,7 +151,7 @@ def test_studio_dock(hy):
         page.keyboard.press("KeyL"); page.set_viewport_size({"width": 1000, "height": 900}); page.wait_for_timeout(700)
         s = strip()
         assert s["inL"] >= -1 and s["inR"] >= -1 and min(s["inL"], s["inR"]) <= 1, s   # pressed to an edge of the free part, not past it
-        page.set_viewport_size({"width": 1440, "height": 900}); page.wait_for_timeout(700)
+        page.set_viewport_size({"width": 1600, "height": 900}); page.wait_for_timeout(700)
         s = strip()
         assert abs(s["ctr"]) <= 1 and s["inL"] >= -1 and s["inR"] >= -1, s
         page.keyboard.press("KeyB"); page.wait_for_timeout(300)

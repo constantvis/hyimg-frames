@@ -34,9 +34,19 @@
     colors: () => ({ fg: S.fg, bg: S.bg }),
     // the same way as the rail's swatches: the colour input of the page, so the mask's toast and the history stay as they were
     setColor(which, v) { const c = document.getElementById('colorIn'); if (!c) return; S.colTarget = which === 'bg' ? 'bg' : 'fg'; c.value = v; c.dispatchEvent(new Event('input')); },
-    link(api) { link = api || null; place(true); },
+    link(api) { link = api || null; note(); place(true); },
     // the list over a group opens where the options were: the strip steps aside while it is open
     fly(on) { obar.classList.toggle('fly', !!on); },
+    // Undo and Redo in the board's dock (owner 2026-10-10 on round 18: one dock, the history in every one): the steps' names, as History
+    // writes them; the studio's «Undo …» note goes to the plate over the dock's button instead (Hyimg's hyDock.steps) while it is docked
+    undo: () => K.undo(), redo: () => K.redo(),
+    steps: () => { const u = S.undo[S.undo.length - 1], r = S.redo[S.redo.length - 1]; return { undo: u ? u.label || '' : '', redo: r ? r.label || '' : '', can: { undo: !!u, redo: !!r } }; },
+  };
+  K.onHist = () => { if (link && link.hist) link.hist(); };
+  const note = () => {   // once, when the dock links: maskwork.js gives K.note after this file
+    if (K.note0 || !K.note) return; K.note0 = K.note;
+    K.note = (text, icon) => ((icon === 'undo' || icon === 'redo') && link && link.step && String(text).startsWith(icon === 'undo' ? T.undone : T.redone)
+      ? link.step(icon) : K.note0(text, icon));
   };
   K.onTool = id => { if (link && link.tool) link.tool(id); };
   K.onColors = () => { if (link && link.colors) link.colors(S.fg, S.bg); };

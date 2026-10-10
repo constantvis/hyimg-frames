@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Image Studio for an agent</title>
+<style>html,body{margin:0;height:100%}iframe{display:block;border:0;width:100%;height:100%}</style>
+</head>
+<body>
+<iframe id="ed" title="Image Studio"></iframe>
+<script>
+// Image Studio for an agent, without the board's window (hyimg/review/imageops.py, `hy.py image run`): this page stands where the board
+// stands when the person opens a frame, ?page=<board page>&id=<frame card>. It reads the card from the board and gives the studio the
+// same host the board gives it (imgframe.js openEditor): the card's Raw Editor and mask come in, and Save hands back what the board's
+// card takes (window.__hySaved, which imageops.py writes onto the card with the board's history). It writes nothing itself.
+(async () => {
+  const q = new URLSearchParams(location.search), page = q.get('page') || 'main', id = q.get('id') || '';
+  try {
+    const r = await fetch('/api/board?name=' + encodeURIComponent(page), { cache: 'no-store' }); if (!r.ok) throw new Error(`board ${page}: ${r.status}`);
+    const it = ((await r.json()).items || {})[id]; if (!it || it.type !== 'imgframe' || !it.doc) throw new Error(`no image frame ${id} on page ${page}`);
+    const nop = () => {};
+    window.hyFrameHost = {
+      id, item: JSON.parse(JSON.stringify(it)), plugin: 'frames', mem: null, crumb: { board: page, page },
+      saved(res) { this.last = res; window.__hySaved = res; return Promise.resolve(); },
+      close: nop, closing: nop, closed: nop, leave: nop, name: nop, rename: nop, toast: nop, zoom: nop, toggleLib: nop, page: () => page,
+    };
+    document.getElementById('ed').src = 'index.html?doc=' + encodeURIComponent(it.doc) + '&frame=' + encodeURIComponent(it.name || 'Frame');
+  } catch (e) { window.__hyHostError = e.message || String(e); }
+})();
+</script>
+</body>
+</html>

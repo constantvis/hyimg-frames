@@ -448,7 +448,7 @@ def test_plugin_speaks_english_by_default(hy):
         page.evaluate("() => fit()")   # in view: a selection out of the window takes its Info card with it (hyimg ui/bars.js, 2026-10-08)
         page.wait_for_timeout(300)
         info = page.locator("#info").inner_text()
-        assert "HTML frame" in info and "Double-click" in info and not CYR.search(page.locator("#iN").inner_text() + page.locator("#iM").inner_text() + page.locator("#iP").inner_text()), info
+        assert "HTML frame" in info and "Double-click" in info and not CYR.search(page.locator("#iN").inner_text() + page.locator("#iM").inner_text() + page.locator("#iNotes").inner_text()), info
         page.dblclick(".plg[data-id=h1]")
         page.wait_for_selector(".hfbar")
         bar = page.evaluate("() => { const b = document.querySelector('.hfbar'); return b.innerText + ' ' + [...b.querySelectorAll('[title],[aria-label]')].map(e => (e.title || '') + ' ' + (e.getAttribute('aria-label') || '')).join(' '); }")
@@ -478,8 +478,9 @@ def test_plugin_speaks_english_by_default(hy):
         badges = page.evaluate(f"() => [...document.querySelectorAll(\".plg[data-id='{fid}'] [title]\")].map(e => e.title).join(' | ')")
         assert "Frame · 1000×450 px" in badges and not CYR.search(badges), badges
         page.evaluate(f"sel = new Set(['{fid}']); render()"); page.wait_for_timeout(300)
-        inf = page.locator("#iN").inner_text() + " " + page.locator("#iM").inner_text() + " " + page.locator("#iP").inner_text()
-        # the info text is one footnote line since the hint rule (2011daa): «Unframe» lives in the right click now, checked below
+        inf = page.locator("#iN").inner_text() + " " + page.locator("#iM").inner_text() + " " + page.locator("#iNotes .pfoot").inner_text()
+        # the info text is one footnote line since the hint rule (2011daa), under the body since Hyimg's round 18 spec sheet (2026-10-10):
+        # «Unframe» lives in the right click now, checked below
         assert "2 images" in inf and "Double-click or Enter: Image Studio · the images inside never change" in inf and not CYR.search(inf), inf
         assert "Open" in page.locator(".tidy").inner_text()
         page.click(f".plg[data-id='{fid}']", button="right")
@@ -506,7 +507,8 @@ def test_editor_library_inset_and_look(hy, engine):
     from playwright.sync_api import sync_playwright
     port, lib, state = hy
     with sync_playwright() as p:
-        browser = getattr(p, engine).launch(); page = browser.new_page(viewport={"width": 1440, "height": 900})
+        # 1600 wide: the dock (with Undo and Redo since 2026-10-10) fits between the open library and the right column
+        browser = getattr(p, engine).launch(); page = browser.new_page(viewport={"width": 1600, "height": 900})
         errors = []; page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(f"http://127.0.0.1:{port}/canvas.html?embed=1")   # as in the app: the board fills the window, the library floats
         page.wait_for_function("() => typeof PLGST !== 'undefined' && PLGST.some(p => p.name === 'frames' && p.ok)", timeout=20000)
@@ -524,12 +526,12 @@ def test_editor_library_inset_and_look(hy, engine):
             mid: Math.round((parseFloat(document.documentElement.style.getPropertyValue('--inset')) + document.getElementById('side').offsetLeft) / 2) }; }"""
         frame = "() => Math.round(document.querySelector('.ifed iframe').getBoundingClientRect().left)"
         a = fr.evaluate(box)
-        assert page.evaluate(frame) == 0 and a["view"] == [0, 1440] and a["rail"] == "none", a
+        assert page.evaluate(frame) == 0 and a["view"] == [0, 1600] and a["rail"] == "none", a
         assert a["obar"][1] < 900 and abs(a["obar"][0] + a["obar"][1] / 2 - a["dock"][1]) <= 1, a   # sized to its tool's options, centred on the dock
         assert abs(a["dock"][1] - a["mid"]) <= 1, a
         page.evaluate("() => postMessage({ type: 'inset', left: 372 }, location.origin)"); page.wait_for_timeout(700)
         b = fr.evaluate(box)
-        assert page.evaluate(frame) == 0 and b["view"] == [0, 1440], b   # the canvas and its rulers stay put
+        assert page.evaluate(frame) == 0 and b["view"] == [0, 1600], b   # the canvas and its rulers stay put
         assert b["mid"] == a["mid"] + 186 and abs(b["dock"][1] - b["mid"]) <= 1, b
         # centred on the dock, or a long strip stepped in just enough: never under the library
         assert 372 + 12 <= b["obar"][0] and (abs(b["obar"][0] + b["obar"][1] / 2 - b["dock"][1]) <= 1 or b["obar"][0] == 372 + 12), b

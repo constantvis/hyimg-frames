@@ -303,8 +303,6 @@ const RU = {
   "Graphite": "Графит",
   "Black": "Черный",
   "Slate": "Сланец",
-  "Interface": "Интерфейс",
-  "Shortcuts in tooltips": "Клавиши в подсказках",
   "Follows the board's <b>Paper</b> setting": "Как в настройке доски <b>Бумага</b>",
   "Actions": "Действия",
   "Brush": "Кисть",
@@ -319,6 +317,7 @@ const RU = {
   "View": "Просмотр",
   "Undo": "Отменить",
   "Redo": "Вернуть",
+  "Undo · ⌘Z": "Отменить · ⌘Z", "Redo · ⇧⌘Z": "Вернуть · ⇧⌘Z",   // the dock's Undo and Redo (studiodock.js, 2026-10-10)
   "Free Transform": "Свободное трансформирование",
   "Content-Aware Fill": "Заливка с учетом содержимого",
   "Canvas Size": "Размер холста",

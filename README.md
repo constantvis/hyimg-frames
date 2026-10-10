@@ -8,7 +8,7 @@ A plugin for [Hyimg](https://github.com/constantvis/Hyimg), the local Figma + Li
 
 Select pictures or a group on the board and press ⌥⌘G (or right click › Into one frame). ⌥⇧⌘G makes a separate frame for each picture. Frames are purple, so you can tell them from pictures at a glance.
 
-Double click a frame, or press Enter, and Image Studio opens right where the frame lies. The board doesn't reload or change zoom: the panels slide in on the right, and the dock turns into the studio's dock: the tool groups, the two colours, the zoom and Actions, with the options of the tool in hand riding right above it. Hold a group with a corner mark for 0.25 s, or press and drag up, and let go on the tool you want; a click takes the tool the button shows, a right click or the corner mark opens the list to click, Esc or letting go elsewhere changes nothing. Esc, Cancel or Save brings back the selection and the view you had before.
+Double click a frame, or press Enter, and Image Studio opens right where the frame lies. The board doesn't reload or change zoom: the panels slide in on the right, and the dock turns into the studio's dock: the tool groups, the two colours, Undo and Redo, the zoom and Actions (⌘K), with the options of the tool in hand riding right above it. Hold a group with a corner mark for 0.25 s, or press and drag up, and let go on the tool you want; a click takes the tool the button shows, a right click or the corner mark opens the list to click, Esc or letting go elsewhere changes nothing. Point at Undo or Redo and a small label above it names the step; after ⌘Z the same label shows for two seconds. Esc, Cancel or Save brings back the selection and the view you had before.
 
 A double click on a plain picture opens the same Image Studio, like Image in the dock's switch. The picture becomes a frame of its own in its place, and the frame stays only if you save; after Cancel the picture is back as it was, with nothing in the board's history. Until the first Save that frame lives only in memory, so a cancelled double click writes nothing to the library. While it is being made the switch already shows Image and the card shimmers like the dock. Cropping a picture is the Crop button on the bar over it, or C. Inside:
 
@@ -45,12 +45,39 @@ What it needs:
 - For content-aware fill: `python3 -m pip install onnxruntime` and the LaMa model (`lama_fp32.onnx`, about 208 MB, Apache-2.0, https://huggingface.co/Carve/LaMa-ONNX) in `~/Library/Caches/Hyimg/models/lama/`. Without the model Image Studio falls back to a simpler fill.
 - For HTML stills: Playwright with Chromium (`python3 -m pip install playwright && python3 -m playwright install chromium`).
 
-**For agents:** don't install the plugin or download the model silently. Ask the person whether they want Frames (Image Studio on the board, plus HTML frames), and separately whether to download the 208 MB LaMa model. Install only after a yes. To work with frames, use `hy.py do 'frame …'` (`frame`, `frame each`, `frame unframe`, `frame rename`, `frame layers`); `hy.py map` lists frames with the pictures inside them.
+**For agents:** don't install the plugin or download the model silently. Ask the person whether they want Frames (Image Studio on the board, plus HTML frames), and separately whether to download the 208 MB LaMa model. Install only after a yes. To work with frames, use `hy.py do 'frame …'` (`frame`, `frame each`, `frame unframe`, `frame rename`, `frame layers`); `hy.py map` lists frames with the pictures inside them. To edit a frame with the studio's tools, see «Image Studio for agents» below.
+
+## Image Studio for agents
+
+An agent uses the same tools as a person, without clicks: select, mask, fill, brush, erase, layers, transform, content-aware fill, save. The commands run inside Image Studio itself (`editor/agentops.js`, `window.hyImage`), so each step is the tool's own step and shows in History under the tool's name. Coordinates are the image's own pixels.
+
+```sh
+hy.py do 'frame <picture id>'                       # a frame from a picture of the board
+hy.py image look <F> [grid=100] [crop=x,y,w,h]      # a PNG with a line every 100 px, labelled in image pixels
+hy.py image run <F> ops.json [--dry] [--grid] [--out P.png]   # the commands headless, then Save; --dry saves nothing
+hy.py image ops                                     # every command and what it takes
+hy.py image export <F> --out P.png                  # the last saved render
+```
+
+`ops.json`, for example red over a phone on a layer of its own at 60 %:
+
+```json
+[{"op": "layer.new", "name": "Red"}, {"op": "select.polygon", "points": [[70, 865], [625, 688], [1054, 1699], [426, 1860]]},
+ {"op": "fill", "color": "#ff0000"}, {"op": "layer.opacity", "value": 60}, {"op": "select.none"}]
+```
+
+The commands: `select.rect|ellipse|polygon|wand|subject|fromImage|all|none|invert|reselect|expand|contract|feather`, `color`, `fill`, `brush`, `erase`, `inpaint`, `layer.new|add|select|transform|opacity|blend|rename|visible|order|duplicate|delete|mergeDown|viaCopy|viaCut|group|clip`, `mask.add|invert|delete|edit`, `mask.master.fromSelection|invert|clear`, `removeBackground`, `undo`, `redo`, `save`, `info`. A layer is named by id, by name, or as `top` or `base`. The ops follow the studio's state like the person's tools do: after `mask.add` the mask is the target, `fill` and `brush` take `mask: false` to paint pixels. A command the tool would refuse fails with the tool's words, the run stops there and nothing is saved.
+
+Save writes a new version (`frame.<n>.json`, `render.<n>.png`); the pictures and the older versions stay, and the frame's card on the board takes the new version as one step of the board's history. The run needs Playwright with Chromium; it opens `editor/agenthost.html`, which hosts the studio the way the board does. In a studio open on the board the same commands run as `hyImage.run([...])`.
+
+Masks from elsewhere: `select.fromImage` loads a mask picture of the library as the selection (white selects, black doesn't, grey partly; a picture of another size is stretched to the document) and combines it by `mode` like a marquee. So a mask the agent made itself, for example a 3D model's silhouette or a segmentation, goes into the studio as a selection, and `select.invert`, `expand`, `feather`, `fill`, `mask.add` and `inpaint` work on it.
+
+Limits: the studio itself segments only through `select.subject` (macOS Vision, the main subject only). Any other object needs a mask PNG for `select.fromImage` or a polygon read off `image look`, checked in the PNG `image run` prints.
 
 ## Files
 
 - `canvas.js`, `imgframe.js`: the board side (cards, making and unframing, the host of Image Studio in place); `studiodock.js`: the studio's tools in the board's dock.
-- `editor/`: Image Studio (`index.html`) and its modules: Raw Editor (`colorgrade.js`, `selcolor.js`), masks (`maskwork.js`), copy and paste (`clipwork.js`), the selection (`selwork.js`), the right click and the layer list's extras (`menus.js`), the base layer (`basework.js`), ⌘ picking a layer (`pickwork.js`), the options over the dock and what the dock asks of the studio (`dockwork.js`).
+- `editor/`: Image Studio (`index.html`) and its modules: Raw Editor (`colorgrade.js`, `selcolor.js`), masks (`maskwork.js`), copy and paste (`clipwork.js`), the selection (`selwork.js`), the right click and the layer list's extras (`menus.js`), the base layer (`basework.js`), ⌘ picking a layer (`pickwork.js`), the options over the dock and what the dock asks of the studio (`dockwork.js`), the agent's commands (`agentops.js`, `agenthost.html`).
 - `inpaint/`: LaMa fill, macOS Vision subject masks, and the plugin's server routes (`POST /api/plugin/frames/<route>`).
 - `tests/`: `HYIMG_REPO=<path to hyimg> python3 -m pytest tests/` (the main flow runs in Chromium and WebKit).
 

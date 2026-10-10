@@ -162,11 +162,6 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 .seg .st{position:absolute;top:2px;height:24px;border-radius:var(--r-in);background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.12),0 0 0 1px var(--line);transition:left .3s var(--ease),width .3s var(--ease)}
 .seg button{position:relative;flex:1;height:24px;border-radius:var(--r-in);color:var(--sub);display:grid;place-items:center;font-size:12px;padding:0 6px;transition:color .2s}
 .seg button.on{color:var(--ink)}
-.tg{display:flex;align-items:center;justify-content:space-between;height:26px;color:var(--sub);font-size:12.5px;cursor:pointer}
-.tg i{position:relative;width:30px;height:18px;border-radius:999px;background:var(--track);transition:background .25s var(--ease)}
-.tg i:after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .28s var(--ease)}
-.tg.on i{background:var(--sel)}
-.tg.on i:after{transform:translateX(12px)}
 .note{font:400 11px/1.35 var(--sans);letter-spacing:.01em;color:var(--hy-hint,var(--muted))}   /* a note is a footnote: the app's hint (ui/look.css .hy-hint, owner 2026-10-06) */
 .note b{font-weight:500;color:var(--ink)}
 .bgsw{width:28px;height:28px;border-radius:var(--r-ctl);box-shadow:inset 0 0 0 1px var(--line);position:relative;transition:transform .18s var(--ease)}
@@ -532,7 +527,6 @@ body.nt #crumb,body.nt #crumb *{transition:none!important}
 .whr .btn{width:34px;padding:0;flex:none}
 .tb2.moff:before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(45deg,transparent 46%,var(--red) 46% 54%,transparent 54%)}
 #dlg .dbtns .dsp{flex:1}
-body.nokeys #tip .kc{display:none}
 .sh svg{color:var(--muted)}
 .btn.wide{width:100%}
 
@@ -720,7 +714,7 @@ const T = hyEdTr({   // in the board's language (i18n.js, the words in lang.js)
   rename: 'Rename', docSize: 'Document Size', reveal: 'Reveal on Board', wouldOpen: w => `Opens ${w}`,
   saveQ: n => `Save changes to "${n}"?`, saveQNote: 'Your changes are lost if you leave without saving.', dontSave: "Don't Save",
   discardQ: 'Close without saving?', discardNote: 'The changes made since the last save will be lost.', discard: 'Discard', keepEditing: 'Keep editing',
-  paper: 'Paper', paperDefault: 'Graphite', paperDeep: 'Black', paperLight: 'Slate', interface: 'Interface', showKeyTips: 'Shortcuts in tooltips',
+  paper: 'Paper', paperDefault: 'Graphite', paperDeep: 'Black', paperLight: 'Slate',
   paperNote: 'Follows the board\'s <b>Paper</b> setting',
   // dock and Actions
   actions: 'Actions', actionsTip: 'Actions: every command, searchable', zoomTip: 'Zoom of the document, click to fit',
@@ -1628,7 +1622,7 @@ function revert(e) {
 }
 function undo() { if (S.stroke) return; if (S.xf) { cancelXf(); return; } const e = S.undo.pop(); if (!e) return toast(T.nothingUndo, 'undo'); revert(e); S.redo.push(e); S.ver++; updHist(); refresh(); toast(T.undone + e.label, 'undo'); }
 function redo() { const e = S.redo.pop(); if (!e) return toast(T.nothingRedo, 'redo'); revert(e); S.undo.push(e); S.ver++; updHist(); refresh(); toast(T.redone + e.label, 'redo'); }
-function updHist() { if (typeof renderHist === 'function') renderHist(); const u = $('#bUndo'), r = $('#bRedo'); if (u) u.classList.toggle('dis', !S.undo.length); if (r) r.classList.toggle('dis', !S.redo.length); }
+function updHist() { if (typeof renderHist === 'function') renderHist(); if (K.onHist) K.onHist(); }   // the board's dock follows: its Undo and Redo (dockwork.js)
 
 /* ================= painting ================= */
 let sprite = null, spriteKey = '';
@@ -1941,11 +1935,6 @@ function NumF(label, o) {
   if (o.unit) el.insertAdjacentHTML('beforeend', `<span class="nu">${o.unit}</span>`);
   const nf = numIn(inp, o, el, el.querySelector('.nl'));
   return { el, sync: nf.sync };
-}
-function Toggle(label, get, set) {
-  const el = div('tg' + (get() ? ' on' : ''), `<span>${label}</span><i></i>`);
-  el.addEventListener('click', () => { set(!get()); el.classList.toggle('on', get()); });
-  return { el, sync() { el.classList.toggle('on', get()); } };
 }
 function Seg(items, get, set) {
   const el = div('seg', '<i class="st"></i>'); const th = el.firstChild;
@@ -3412,13 +3401,13 @@ function cancelFrame() { if (S.saving) return toast(T.savingWait, 'frame'); if (
 function askLeave(discard, save) { import('/ui/confirm.js').then(m => (m.hyLeave || (o => m.hyConfirm({ title: T.saveQ(o.name), note: T.saveQNote, ok: T.discard, cancel: T.keepEditing, onOk: o.discard, accent: o.accent, save: { label: T.save, run: o.save } })))({ name: FR.name, discard, save, accent: 'var(--frame)' })); }
 // the last Esc, the board's Board segment and another Studio's: the work kept, saved when there is any; a promise, done once it is closed or stayed
 function keepFrame() { if (S.saving || S.leaving) return Promise.resolve(); return isDirty() ? (K.away && K.away.can() ? K.away.go() : saveFrame()) : Promise.resolve(closeEditor()); }
-// settings: the paper the editor sits on, as the board's own setting (cv.paperDark)
+// settings: the paper the editor sits on, as the board's own setting (cv.paperDark). Its own «Shortcuts in tooltips» switch is gone: a
+// tooltip always names its key, as Mac menus and Figma do (owner 2026-10-10, round 18 question 19, version B); it was never stored
 const sets = $('#sets');
 const PAPERS = [['#17171a', T.paperDefault], ['#0c0c0e', T.paperDeep], ['#232327', T.paperLight]];
 sets.innerHTML = `<div class="sh2">${T.paper}</div><div class="opts">${PAPERS.map(([v, l]) => `<button data-v="${v}" aria-pressed="${PAPER.toLowerCase() === v}"><i style="background:${v}"></i>${l}</button>`).join('')}</div>` +
-  `<div class="sh2">${T.interface}</div>` + `<div class="sopt" id="setTips"></div><div class="setnote hy-hint">${T.paperNote}</div>`;
+  `<div class="setnote hy-hint">${T.paperNote}</div>`;
 sets.querySelector('.opts').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; setPaper(b.dataset.v); sets.querySelectorAll('.opts button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
-const tipsT = Toggle(T.showKeyTips, () => S.keyTips !== false, v => { S.keyTips = v; document.body.classList.toggle('nokeys', !v); }); $('#setTips').append(tipsT.el);
 function setPaper(v) { PAPER = v; document.documentElement.style.setProperty('--paper', v); try { localStorage.setItem('cv.paperDark', v); } catch (e) {} S.odirty = true; }
 bset.addEventListener('click', () => { const on = !sets.classList.contains('on'); sets.classList.toggle('on', on); bset.setAttribute('aria-expanded', String(on)); });
 document.addEventListener('pointerdown', e => { if (sets.classList.contains('on') && !e.target.closest('#sets, #bset')) { sets.classList.remove('on'); bset.setAttribute('aria-expanded', 'false'); } }, true);
@@ -3931,12 +3920,14 @@ window.__ed = { get ready() { return !!S.ready; }, docJSON, loadDoc, open: openI
 Object.assign(K, { S, T, svg, esc, mk, copyC, bump, one, selNodes, topSel, byId, locate, walk, isPinned, isMain, isMM, mmNode, edit, beginEdit, endEdit, pxEdit, toast, refresh,
   renderLayers, openMenu, closeMenu, Field, reg, btn, nodeM, LM, viewM, blurDraw, selToLocal, ensureSel, sel: () => ({ c: selC, k: selK }), deselect, selectAll, invertSel, growSel,
   featherDialog, valueDialog, copyToLayer, duplicate, deleteSel, groupSel, ungroup, mergeDown, mergeVisible, rasterize, toggleClip, clipPairAt, addMask, deleteMask, invertMask,
-  maskMenu, mmMenu, enterMaskMode, applyMaskMode, leaveMaskMode, toggleFilm, startFT, undo, fillSelection, hitTest, toDoc, pixNode, docCanvas, insertAbove, lk, lockedByGroup,
+  maskMenu, mmMenu, enterMaskMode, applyMaskMode, leaveMaskMode, toggleFilm, startFT, undo, redo, fillSelection, hitTest, toDoc, pixNode, docCanvas, insertAbove, lk, lockedByGroup,
   userLock, setLock, dockRect, clearInSel, linkSel, newLayer, setTool, dims: () => [W, H], view, get dpr() { return dpr; }, adjNode, deepCopy, HyCG, putFile, fileURL,
   TOOLS, loadImg, frameName: () => FR.name, renderView: () => { S.dirty = true; }, moveSet, boxOf, aabb, isDesc, mmCopy, isDirty, saveFrame, syncView, layout, closeActs, hideTip, ENT, host: () => HOST });
+Object.assign(K, { shapePath, wandAt, featherSel, selBounds, redo });   // what the agent's commands call besides (agentops.js)
 })();
 </script>
 <script src="basework.js"></script><script src="pickwork.js"></script><script src="dockwork.js"></script><script src="annwork.js"></script><script src="awaywork.js"></script>
+<script src="agentops.js"></script>   <!-- window.hyImage, the agent's commands: the same tools without the clicks -->
 <script src="maskwork.js"></script><script src="clipwork.js"></script><script src="selwork.js"></script><script src="menus.js"></script>   <!-- after the page's script: they take window.hyEdK -->
 </body>
 </html>

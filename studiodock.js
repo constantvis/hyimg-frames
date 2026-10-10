@@ -1,8 +1,10 @@
 // Image Studio's tools in the board's dock (owner 2026-10-08, round 11 «Tools in the dock · D3», note neb38wlg: «Все, отлично, давай делай
 // так»; earlier: «зажимаешь внизу какой-то из пунктов, ведешь мышкой вверх и отпускаешь, и выбираем тот или иной элемент, чтобы сократить
 // количество кликов»; round 10: the tool column on the left goes into the bottom dock, packed compactly). While the studio is open the
-// board's dock carries, left to right: the tool groups, the two colours, the zoom and Actions; the board's switch of studios stays at its
-// right end (review/ui/modes.js). The options of the tool in hand ride right above the dock (the studio's #obar, editor/dockwork.js).
+// board's dock carries, left to right: the tool groups, the two colours, Undo and Redo, the zoom and Actions; the board's switch of studios
+// stays at its right end (review/ui/modes.js). One dock for the board and every Studio (owner 2026-10-10 on round 18, r18-dock.html):
+// 36 × 34 buttons with no plate, a hairline between the groups, Undo and Redo name their step on a plate over them (Hyimg's ui/dock.js).
+// The options of the tool in hand ride right above the dock (the studio's #obar, editor/dockwork.js).
 // A group with more than one tool has a corner mark and opens its list above the button, as the macOS menu gesture:
 //   a plain click        takes the tool the button shows
 //   hold 0.25 s, or press and drag up 6 px   the list opens; the tool under the pointer lights up, let go on it and it is in hand
@@ -62,6 +64,7 @@ export function studioDock({ t, win, K, zoom, acts }) {
   const ic = (id, s) => (K.svg ? K.svg(id, s) : "");   // the studio's own names for its tools' icons (pick: the eyedropper)
   const toolOf = id => { for (const g of G) { const x = g.tools.find(y => y.id === id); if (x) return [g, x]; } return [null, null]; };
   const keyText = x => x.keys.join("");
+  const hic = n => (window.hyIcon ? window.hyIcon(n, 17, 1.85) : "");
   const node = document.createElement("span");
   node.innerHTML = G.map(g => { const multi = g.tools.length > 1, x = g.tools[0];
     return `<button class="ifg${multi ? " multi" : ""}" data-g="${g.id}" data-t="${x.id}" aria-haspopup="${multi ? "menu" : "false"}">${ic(x.id, 17)}`
@@ -70,8 +73,9 @@ export function studioDock({ t, win, K, zoom, acts }) {
     + `${ic("comment", 17)}</button><span class="sep"></span><span class="ifcol" role="group" aria-label="${esc(t("Colors"))}">`
     + `<button class="fg" title="${esc(t("Foreground color") + " · " + t("X swaps, D resets"))}"></button>`
     + `<button class="bg" title="${esc(t("Background color") + " · " + t("X swaps, D resets"))}"></button><input type="color" tabindex="-1" aria-hidden="true"></span>`
-    + `<span class="sep"></span>`;
-  node.append(zoom, acts);
+    + `<span class="sep"></span><button class="ifu hy-dkb" data-a="undo" title="${esc(t("Undo · ⌘Z"))}" aria-label="${esc(t("Undo"))}">${hic("undo")}</button>`
+    + `<button class="ifu hy-dkb" data-a="redo" title="${esc(t("Redo · ⇧⌘Z"))}" aria-label="${esc(t("Redo"))}">${hic("redo")}</button><span class="sep"></span>`;
+  const sep2 = document.createElement("span"); sep2.className = "sep"; node.append(zoom, sep2, acts);
   const btns = [...node.querySelectorAll("button.ifg")], back = () => { try { win.focus(); } catch (e) {} };
   // a group's button shows the tool it would take, its name and key in the tooltip
   function show(b, id) {
@@ -80,6 +84,15 @@ export function studioDock({ t, win, K, zoom, acts }) {
     const tip = x.name + (x.keys.length ? " · " + keyText(x) : "") + (b.classList.contains("multi") ? " · " + t("hold and drag up for the others") : "");
     b.title = tip; b.setAttribute("aria-label", x.name);
   }
+  // Undo and Redo: the studio's steps; the plate over them names the step (Hyimg's hyDock.steps), after ⌘Z too (editor/dockwork.js link.step)
+  const undoB = node.querySelector("[data-a=undo]"), redoB = node.querySelector("[data-a=redo]");
+  const ST = window.hyDock ? window.hyDock.steps({ undo: undoB, redo: redoB, name: dir => D.steps ? D.steps()[dir] : "" }) : null;
+  const hist = () => { const s = D.steps ? D.steps().can : { undo: true, redo: true }; undoB.disabled = !s.undo; redoB.disabled = !s.redo; };
+  [undoB, redoB].forEach(b => {
+    b.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener("click", e => { e.stopPropagation(); if (D.undo) (b === undoB ? D.undo : D.redo)(); back(); });
+  });
+  hist();
   const annB = node.querySelector("button.ifann");   // Annotation: C in the studio, again or Esc gives the tool before it back (editor/annwork.js)
   annB.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); });
   annB.addEventListener("click", e => { e.stopPropagation(); D.setTool(D.tool() === "comment" ? (K.annBack ? K.annBack() : "select") : "comment"); sync(D.tool()); back(); });
@@ -194,7 +207,7 @@ export function studioDock({ t, win, K, zoom, acts }) {
     if (!dock) return; const w = dock.offsetWidth || 0;
     dock.style.setProperty("--ifdx", Math.max(c, l + w / 2 + 8) + "px"); dock.classList.add("ifmid");
   }
-  D.link({ tool: id => sync(id), colors, key, center, outside: () => { if (F && !P) closeFly(); } });
+  D.link({ tool: id => sync(id), colors, key, center, outside: () => { if (F && !P) closeFly(); }, hist, step: dir => { hist(); if (!ST) return false; ST.done(dir); return true; } });
   return {
     node, close: closeFly, sync, get open() { return !!F; },
     destroy() {
