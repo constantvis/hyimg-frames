@@ -112,7 +112,7 @@ def test_mask_copy_paste_round_trip_and_the_properties_clipboard(hy, engine):
         # back on the board: the mask copied in the studio pastes onto a picture there
         fr.locator(f"#rows .lr[data-id='{b}'] .tb2.msk").click(); settle(fr); page.keyboard.press("Meta+c"); settle(fr, 600)
         f = json.loads(fr.evaluate("() => localStorage.getItem('cv.propsClip')"))["kinds"]["mask"]["file"]
-        fr.evaluate("() => __ed.cancelFrame()"); fr.wait_for_selector("#dlgw.on"); fr.locator("#dlg [data-a=ok]").click()
+        fr.evaluate("() => __ed.cancelFrame()"); fr.wait_for_selector("#hyConfirm.on"); fr.locator("#hyConfirm [data-a=ok]").click()   # Discard
         closed(page)
         page.evaluate("() => pasteProps(propsClip().kinds, ['g1'])"); page.wait_for_timeout(400)
         assert page.evaluate("() => board.items.g1.mask && board.items.g1.mask.file") == f

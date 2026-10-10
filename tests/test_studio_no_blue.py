@@ -68,13 +68,15 @@ def test_image_studio_has_no_board_blue(hy):
         page.wait_for_timeout(450)   # the note's way in
         no_blue(page, fr, "the studio with a picked layer, a checked box and the History's note")
 
-        # «Close without saving?»: Discard filled with the purple, white words; Cancel as it was
-        fr.evaluate("() => __ed.cancelFrame()"); fr.wait_for_selector("#dlgw.on #dlg .ok", timeout=3000); page.wait_for_timeout(400)
-        assert fr.evaluate(BTN, "#dlg .ok") == [purple, "rgb(255, 255, 255)"], fr.evaluate(BTN, "#dlg .ok")
-        cancel = fr.evaluate("() => { const b = [...document.querySelectorAll('#dlg .dbtns button')].find(b => !b.classList.contains('ok')); return getComputedStyle(b).backgroundColor; }")
-        assert cancel != purple, cancel
+        # «Close without saving?» (Hyimg's one question, P4 S-03): its primary answer Save filled with the purple, white words; Keep editing
+        # and Discard as they were
+        fr.evaluate("() => { hyEdK.edit('Opacity Change', () => { __ed.root.find(n => n.type === 'pixel').opacity = 44; }); __ed.cancelFrame(); }")   # a change: the question
+        fr.wait_for_selector("#hyConfirm.on [data-a=save]", timeout=3000); page.wait_for_timeout(400)
+        assert fr.evaluate(BTN, "#hyConfirm [data-a=save]") == [purple, "rgb(255, 255, 255)"], fr.evaluate(BTN, "#hyConfirm [data-a=save]")
+        for a in ("no", "ok"):
+            assert fr.evaluate(BTN, f"#hyConfirm [data-a={a}]")[0] != purple
         no_blue(page, fr, "the dialog")
-        fr.click("#dlg .ok"); closed(page)
+        fr.click("#hyConfirm [data-a=ok]"); closed(page)
 
         # back on the board: the board's blue on the root again
         page.wait_for_function("() => !document.documentElement.dataset.studio", timeout=3000)

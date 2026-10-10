@@ -182,7 +182,7 @@
   };
   // the app lost the focus to another app: what this page copied may no longer be the newest, the Mac's clipboard decides (the paste event)
   try { top.addEventListener('blur', () => setTimeout(() => { try { if (!top.document.hasFocus()) K.clip = null; } catch (er) {} }, 0)); } catch (er) {}
-  const typing = e => e.target.closest && e.target.closest('input, textarea, select, [contenteditable=true]');
+  const typing = e => (window.hyTyping && hyTyping(e)) || (e.target.closest && e.target.closest('input, textarea, select, [contenteditable=true]'));
   const busy = () => !S.ready || document.getElementById('dlgw').classList.contains('on');
   addEventListener('keydown', e => {
     if (!(e.metaKey || e.ctrlKey) || typing(e) || busy()) return;

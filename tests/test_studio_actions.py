@@ -30,9 +30,9 @@ def test_image_studio_actions_top_right(hy):
         purple = fr.evaluate(PROBE, "var(--frame)")
         save = fr.evaluate("() => { const b = document.querySelector('#topr [data-a=save]'), c = getComputedStyle(b); "
                            "return [b.getAttribute('variant'), c.backgroundColor, c.color, !!b.querySelector('svg'), b.dataset.key, b.querySelector('kbd').textContent, !!b.title]; }")
-        assert save == ["accent", purple, "rgb(255, 255, 255)", True, "⌘ ↵", "⌘ ↵", False], save
+        assert save == ["accent", purple, "rgb(255, 255, 255)", True, "⌘↵", "⌘↵", False], save   # one spelling of the cap (P4 S-60)
         cancel = fr.evaluate("() => { const b = document.querySelector('#topr [data-a=cancel]'); return [getComputedStyle(b).backgroundColor, b.dataset.tip, b.dataset.key]; }")
-        assert cancel[0] != purple and cancel[1] and cancel[2] == "Esc", cancel
+        assert cancel[0] != purple and cancel[1] and not cancel[2], cancel   # Esc keeps the work, it is not Cancel's key (owner decision 2026-10-10, S-27)
         # Cancel from the top leaves the studio (nothing changed: no question)
         fr.click("#topr [data-a=cancel]"); closed(page)
         assert not errors, errors

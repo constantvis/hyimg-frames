@@ -46,7 +46,9 @@ def test_blend_mode_previews_on_hover_and_commits_on_click(hy, engine):
         browser, page, fr, errors = open_editor(p, port, engine)
         fr.wait_for_timeout(900)   # the panels slide in first: a click while they move would make Playwright scroll the board under the editor
         writes = []
-        page.on("request", lambda r: writes.append(r.url) if r.method not in ("GET", "HEAD") and "/api/" in r.url and "/api/stat" not in r.url else None)   # stat: the board's look at its files
+        # stat: the board's look at its files; live, settings: its camera (the studio's fit, P4 S-61) and preferences
+        quiet = ("/api/stat", "/api/live", "/api/settings")
+        page.on("request", lambda r: writes.append(r.url) if r.method not in ("GET", "HEAD") and "/api/" in r.url and not any(x in r.url for x in quiet) else None)
         bid = fr.evaluate(SETUP); fr.evaluate(FRAMES2)
         s0 = state(fr, bid); assert s0["blend"] == "source-over" and s0["undo"] == 0, s0
         normal = fr.evaluate(PIX, AT)

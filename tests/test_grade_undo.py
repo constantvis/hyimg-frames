@@ -57,7 +57,7 @@ def test_undo_redo_with_the_grading_open(hy, engine):
         page.wait_for_function(f"() => past.length === {s0 + 1} && !__grade.P.before", timeout=5000)
         page.wait_for_timeout(700)
         c1 = contrast(page); assert c1["steps"] == s0 + 1, c1
-        assert page.evaluate("() => document.activeElement.type") == "range"   # the slider keeps the focus, as a native one does
+        assert page.evaluate("() => document.activeElement.type") != "range"   # let go, the slider gives the keys back (P4 S-15, 2026-10-10)
         shot(page, f"undo-1-{engine}-dragged.png")
         # ⌘Z with the slider focused: the grade goes, the panel and the card follow
         page.keyboard.press("Meta+z")

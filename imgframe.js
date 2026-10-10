@@ -21,6 +21,7 @@ import { translator } from "./lang.js";   // English or Russian, as the board is
 import { registerGrade, dress, loadCG } from "./grade.js";   // the colour grade of any picture and frame card (owner 2026-10-06), its own module
 import { registerMask, dressMask, maskCanvas } from "./mask.js";   // the master mask of any picture and frame card (owner 2026-10-06)
 import { studioDock } from "./studiodock.js";   // the studio's tools in the board's dock (owner 2026-10-08, round 11 D3)
+import { annHost } from "./annhost.js";   // the board's side of the studio's annotations on layers (owner 2026-10-09, round 15)
 const TYPE = "imgframe", MAXDOC = 8000, KEEP = 10;
 // the menus' and the bar's icons are the app's (ui/icons.js, 15 px in the menus' 1.9 line; owner 2026-10-07: «одно значение, одна иконка»):
 // the image studio opens with its own icon, Image mode's; a frame taken apart wears «ungroup»
@@ -34,7 +35,7 @@ let t = k => k;   // the plugin's words (lang.js), set at register
 const picsWord = n => t("{n} images", { n: String(n) });
 const framesWord = n => t("{n} frames", { n: String(n) });
 const $ = s => document.querySelector(s);
-let HY, ED = null, making = false, DK = null;   // ED: the open editor {id, ...}; DK: its tools in the dock (studiodock.js)
+let HY, ED = null, making = false, DK = null, ANN = null;   // ED: the open editor {id, ...}; DK: its tools in the dock (studiodock.js)
 
 const canGo = it => HY.isPic(it) && !VIDEO.test(it.path || "");   // pictures go in; a video frame is phase 2
 const isFrame = it => !!it && it.type === TYPE;
@@ -47,7 +48,11 @@ async function put(path, body) {
 // library): path -> blob URL, read by the card (card) and the studio (host.mem), let go when the studio closes
 let MEM = {};
 const memPut = mem => async (path, body) => { mem[path] = URL.createObjectURL(body instanceof Blob ? body : new Blob([body], { type: "application/json" })); return { mtime: Date.now() * 1e6 }; };
-function dropMem() { for (const u of Object.values(MEM)) URL.revokeObjectURL(u); MEM = {}; }
+// let go of one session's files (only), or of all but those of a picture whose save still runs or failed (SAVING: its work comes back)
+function dropMem(only) {
+  const keep = new Set([...SAVING.values()].flatMap(s => Object.keys(s.mem || {})));
+  for (const [p, u] of Object.entries(MEM)) if (only ? p in only : !keep.has(p)) { URL.revokeObjectURL(u); delete MEM[p]; }
+}
 const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.decoding = "async"; i.onload = () => res(i); i.onerror = () => rej(new Error(t("no image"))); i.src = src; });
 // The pictures' own pixel sizes (owner 2026-10-05: «the document must use the source's native pixels»). The library reads them from the
 // file headers (/api/sizes); a picture it does not know is loaded once. The header ignores a camera's rotation flag (EXIF), the board
@@ -200,21 +205,24 @@ async function explode(id) {
 // (the picture before, the frame after), leaving without a Save puts the picture back as it was. The file is never written
 async function wrapPic(id) {
   const it = HY.board.items[id]; if (making || !it || !canGo(it)) return null;
-  making = true; editorFrame();   // the studio's page loads while the frame is made
+  making = true; editorFrame(); let mem = null;   // the studio's page loads while the frame is made
   if (HY.busy) HY.busy("studio", t("Opening Image Studio"), id);   // the dock's sweep, on the card too, until the studio shows
   try {
-    dropMem();
-    const nat = await naturalSizes([it.path], [it]), r = await buildFrame([id], frameName(), nat, MEM);
+    dropMem(); mem = {};
+    // a picture is called by its file until it is saved as a frame (owner decision 2026-10-10, P4 S-53 A), not «Frame 1»; its first Save
+    // keeps that name (owner decision 2026-10-10: no «Frame N» after it either)
+    const nat = await naturalSizes([it.path], [it]), r = await buildFrame([id], String(it.path).split("/").pop() || frameName(), nat, mem);
+    Object.assign(MEM, mem);
     try { await loadImg(MEM[r.card.render]); } catch {}   // decoded before the card shows it: no empty card on the way in
-    const cur = HY.board.items[id]; if (!cur || !canGo(cur) || cur.path !== it.path || PENDING !== id) { dropMem(); return null; }   // the picture left, or Esc
+    const cur = HY.board.items[id]; if (!cur || !canGo(cur) || cur.path !== it.path || PENDING !== id) { dropMem(mem); return null; }   // the picture left, or Esc
     const before = HY.snap();
     HY.board.items[id] = r.card; HY.sel = new Set([id]); HY.render();
     // the studio starts from the card's picture while its layers load (host.preview): wait for it, briefly
     const im = document.querySelector(`.plg[data-id="${CSS.escape(id)}"] img.ifr`);
     if (im && !(im.complete && im.naturalWidth)) await new Promise(ok => { const tm = setTimeout(ok, 1000), end = () => { clearTimeout(tm); ok(); };
       im.addEventListener("load", end, { once: true }); im.addEventListener("error", end, { once: true }); });
-    return { pic: cur, card: r.card, before };
-  } catch (e) { dropMem(); HY.toast(t("Frame not made: {e}", { e: e.message }), "error"); return null; }
+    return { pic: cur, card: r.card, before, mem };
+  } catch (e) { if (mem) dropMem(mem); HY.toast(t("Frame not made: {e}", { e: e.message }), "error"); return null; }
   finally { making = false; if (HY.busy) HY.busy("studio", null, id); }
 }
 function unwrap(id, wrap) { if (wrap && isFrame(HY.board.items[id])) { HY.board.items[id] = wrap.pic; HY.render(); } }
@@ -254,22 +262,27 @@ function camBridge(it) {
 }
 
 async function openEditor(id, wrap = null) {
+  if (!wrap && SAVING.has(id)) return openSaving(id);   // its last work is still being written, or was refused: that work, never the older file
   const it = HY.board.items[id]; if (!it || ED || making) { if (wrap) dropMem(); return unwrap(id, wrap); }
   // what the board was before: Esc, Cancel or Save bring back this selection and view (owner 2026-10-07)
   const back = { sel: [...HY.sel], cam: { x: HY.cam.x, y: HY.cam.y, z: HY.cam.z } };
   ED = { id, opening: true };
   const win = await editorFrame();
   const card = document.querySelector(`.plg[data-id="${CSS.escape(id)}"]`), img = card && card.querySelector("img.ifr");
+  const ses = { id, wrap, back, mem: wrap ? wrap.mem : null, path: wrap ? wrap.pic.path : null, f: EDF };
   const host = {
-    id, item: JSON.parse(JSON.stringify(it)), cam: camBridge(it), plugin: PLUGIN, mem: wrap ? MEM : null,
+    id, item: JSON.parse(JSON.stringify(it)), cam: camBridge(it), plugin: PLUGIN, mem: wrap ? MEM : null, pic: wrap ? wrap.pic : null,   // pic: annwork.js
     preview: card && it.grade && card.querySelector(":scope > canvas.grd") || (img && img.complete && img.naturalWidth ? img : null),   // the graded look while the layers load
-    saved: res => saved(id, res), closing, closed, leave, toast: (t, k) => HY.toast(t, k),
+    saved: res => saved(id, res, ses), closing, closed, leave, toast: (t, k) => HY.toast(t, k),
+    away: () => away(ses), done: () => awayDone(ses), failed: e => awayFailed(ses, e),   // leaving before the write (awaywork.js)
     toggleLib: () => { try { parent !== window && parent.postMessage({ type: "toggleCanvasFull" }, location.origin); } catch {} },
     zoom: t => { const z = $("#ifZoom"); if (z && z.textContent !== t) z.textContent = t; },
     name: n => { const s = $("#cIfr .ifn"); if (s) s.textContent = n; },
     rename: () => renameStep(),
+    page: () => (typeof BOARD !== "undefined" ? BOARD : "main"),   // the board's page (canvas.html): a thread from the Annotations tab goes there
   };
-  ED = { id, win, host, card, wrap, back };
+  ED = Object.assign(ses, { win, host, card });
+  if (ANN) ANN.open(ED);
   EDF.wrap.classList.add("on");
   win.__ed.open(host);   // draws the frame where it lies, in this same frame of the screen
   if (card) card.classList.add("ifhide");
@@ -286,7 +299,7 @@ function closing() {
   if (card) card.classList.remove("ifhide");
   if (ED.wrap) { unwrap(ED.id, ED.wrap); ED.wrap = null; }   // left without a Save: the picture, as it was
   veil(null, false); document.documentElement.classList.remove("ifedit");
-  crumbStep(null); dockSwap(null); if (DK) { DK.destroy(); DK = null; }
+  crumbStep(null); dockSwap(null); if (DK) { DK.destroy(); DK = null; } if (ANN) ANN.close();
   try { EDF.f.blur(); window.focus(); } catch {}   // the keys go to the board again (⌘Z right after a Save undoes it on the board)
 }
 function closed() {
@@ -312,7 +325,108 @@ function glide(to) {
   };
   requestAnimationFrame(step);
 }
-function closeNow() { if (!ED || !ED.win) return; try { ED.win.__ed.exit(); } catch { closing(); closed(); } }
+// the studio's way out that keeps the work (the Board segment, another Studio's, a page switch): a promise, done once saved and closed or
+// once it stayed (a Save refused); owner decision 2026-10-10, P4 S-27 A
+function closeNow() { if (!ED || !ED.win) return Promise.resolve(); try { return Promise.resolve(ED.win.__ed.exit()); } catch { closing(); closed(); return Promise.resolve(); } }
+
+// Leaving keeps the work without waiting for it (owner decision 2026-10-10, «а ты как лучше думаешь»). The last Esc, the Board segment,
+// another Studio's and a page switch close the studio at once: the board is back, the card shows its last still with a busy LED, and the
+// studio's page, hidden, renders and writes the work (editor/awaywork.js), then the card shows it. Refused, the card's LED turns red and a
+// note offers «Open again»: the same page comes back with the work as it was left. Until the write is confirmed the page stays: opening
+// the card meanwhile waits for it, or brings back that page when the write failed, never the older file
+const SAVING = new Map();   // card id -> its session (ED as it was), state "saving" | "failed", done: a promise of true (written) or false
+const nameOf = ses => { try { return ses.win.hyEdK.frameName(); } catch { return ses.host.item.name || t("Frame"); } };
+function away(ses) {
+  if (ED !== ses) return;
+  const { id, card, back, f } = ses, name = nameOf(ses);
+  ses.state = "saving"; ses.done = new Promise(ok => { ses.settle = ok; }); SAVING.set(id, ses);
+  if (HY.busy) HY.busy("save:" + id, t("Saving “{name}”", { name }));   // the dock's sweep, and a board that must not sleep yet
+  if (card) card.classList.remove("ifhide");
+  if (ses.wrap) unwrap(id, ses.wrap);   // a picture not yet saved as a frame: the picture, until the frame is written
+  veil(null, false); document.documentElement.classList.remove("ifedit");
+  crumbStep(null); dockSwap(null); if (DK) { DK.destroy(); DK = null; } if (ANN) ANN.close();
+  try { f.f.blur(); window.focus(); } catch {}
+  ED = null; f.wrap.classList.add("away"); EDF = null; edReady = null;   // the next opening loads a page of its own
+  HY.modeChanged(); leds(id);
+  setTimeout(() => {   // the page's own fade, as closed() after exitBoard
+    if (ses.state === "open") return;
+    f.wrap.classList.remove("on");
+    if (back) HY.sel = new Set(back.sel.filter(i => HY.board.items[i] || HY.board.groups[i]));
+    HY.render(); if (back) glide(back.cam);
+  }, 420);
+}
+function awayDone(ses) {
+  if (SAVING.get(ses.id) !== ses) return;
+  SAVING.delete(ses.id); ses.state = "done"; ses.f.wrap.remove();
+  if (HY.busy) HY.busy("save:" + ses.id, null);
+  if (ses.mem) dropMem(ses.mem);
+  HY.render(); leds(ses.id); ses.settle(true); preload();
+}
+function awayFailed(ses, e) {
+  if (SAVING.get(ses.id) !== ses) return;
+  ses.state = "failed"; ses.err = String(e || "");
+  if (HY.busy) HY.busy("save:" + ses.id, null);
+  leds(ses.id); ses.settle(false); refused(ses);
+}
+// the note of a refused write, sticky, with the way back to the work
+function refused(ses) {
+  HY.toast(t("“{name}” not saved: {e}", { name: nameOf(ses), e: ses.err }), "error",
+    { sticky: true, key: "ifsave:" + ses.id, actions: [{ label: t("Open again"), fn: () => reopen(ses) }] });
+}
+// the studio comes back over the card with the work as it was left (a refused write)
+function reopen(ses) {
+  const { id } = ses;
+  if (SAVING.get(id) !== ses || ses.state !== "failed") return false;
+  if (ED || PENDING || making) { HY.toast(t("Close the open studio first")); return false; }
+  if (!HY.board.items[id]) { HY.toast(t("The card is no longer on this page"), "error"); return false; }
+  SAVING.delete(id); ses.state = "open";
+  if (ses.wrap) HY.board.items[id] = ses.wrap.card;   // the picture's frame again, in memory as before
+  HY.sel = new Set([id]); HY.render(); leds(id);
+  if (EDF && EDF !== ses.f) EDF.wrap.remove();   // a page loaded meanwhile for another opening goes: this one holds the work
+  EDF = ses.f; edReady = Promise.resolve(ses.win);
+  ses.card = document.querySelector(`.plg[data-id="${CSS.escape(id)}"]`);
+  ED = ses; if (ANN) ANN.open(ED);
+  EDF.wrap.classList.remove("away"); EDF.wrap.classList.add("on");
+  try { ses.win.hyEdK.away.resume(); } catch (e) { console.error(e); }
+  if (ses.card) ses.card.classList.add("ifhide");
+  veil(HY.board.items[id], true); document.documentElement.classList.add("ifedit");
+  crumbStep(nameOf(ses)); dockSwap(editorDock());
+  try { EDF.f.contentWindow.focus(); } catch {}
+  HY.modeChanged();
+  return true;
+}
+// a card whose work is on its way: the studio opens once it is written, or comes back with it when the write was refused
+async function openSaving(id) {
+  const s = SAVING.get(id); if (!s) return false;
+  if (s.state === "failed") return reopen(s);
+  PENDING = id; HY.modeChanged();   // Image at once, as for a picture's frame being made; Esc calls it off
+  const ok = await s.done, go = PENDING === id; PENDING = null;
+  if (!go) return HY.modeChanged();
+  if (!ok) return reopen(s);
+  HY.modeChanged(); return openEditor(id);
+}
+// the card's LED (hy-led, Hyimg ui/hy/led.js): busy while its work is written, red when the write was refused; on a picture whose first
+// frame is on its way too (HY.pic)
+const sesOf = (id, path) => SAVING.get(id) || (path ? [...SAVING.values()].find(s => s.path === path) : null);
+function led(el, id, path) {
+  const s = sesOf(id, path), st = s ? (s.state === "failed" ? "err" : "busy") : "";
+  let l = el.querySelector(":scope > hy-led.ifled");
+  if (!st) { if (l) l.remove(); return; }
+  if (!l) { l = document.createElement("hy-led"); l.className = "ifled"; el.appendChild(l); }
+  l.setAttribute("state", st);
+  l.setAttribute("label", st === "err" ? t("Not saved: open it again, the work is kept") : t("Saving…"));
+}
+function leds(id) { const el = document.querySelector(`#items > [data-id="${CSS.escape(id)}"]`); if (el) { const it = HY.board.items[id]; led(el, id, it && it.path); } }
+// a key the board's page got while the studio is open (the focus on the zoom, the switch, the crumb): the studio's, as if typed in it (P4 S-34)
+function forward(e) {
+  const w = ED && ED.win; if (!w) return;
+  try { EDF.f.focus(); w.focus(); } catch {}
+  const ev = new w.KeyboardEvent("keydown", { key: e.key, code: e.code, keyCode: e.keyCode, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey,
+    altKey: e.altKey, repeat: e.repeat, bubbles: true, cancelable: true });
+  if (!(w.document.activeElement || w.document.body).dispatchEvent(ev)) e.preventDefault();
+}
+// once the studio's page has its frame: fn(win), else never
+async function whenOpen(fn) { for (let i = 0; i < 200; i++) { if (ED && ED.win && ED.win.__ed && ED.win.__ed.ready) return fn(ED.win); if (!ED && !PENDING) return; await new Promise(r => setTimeout(r, 50)); } }
 // Home and the project go on through the board's own crumb buttons once the editor is gone; the board and the page are where it was
 function leave(where) {
   closing(); closed();
@@ -322,12 +436,14 @@ function leave(where) {
 // the editor saved: the card shows the new version (one step to undo on the board); a document that changed its shape (Canvas Size,
 // Crop) keeps the card's place and width, its height follows. Resolves once the card shows the new render, so the editor leaves over
 // the same picture
-function saved(id, res) {
+function saved(id, res, ses) {
   // a picture opened in the studio: its first Save is one step from the picture to the frame (wrapPic); the board read again from its
-  // file meanwhile has the picture there, the frame comes back under the same id
-  const w = ED && ED.id === id && ED.wrap; if (w) { ED.wrap = null; if (!isFrame(HY.board.items[id])) HY.board.items[id] = w.card; }
+  // file meanwhile has the picture there (or the studio left before the write and gave the picture back), the frame comes back under
+  // the same id. A picture taken off the board meanwhile stays off
+  const w = ses && ses.wrap; if (w) { ses.wrap = null; const cur = HY.board.items[id]; if (cur && !isFrame(cur)) HY.board.items[id] = w.card; }
   const it = HY.board.items[id]; if (!it || !res) return Promise.resolve();
-  const before = w ? w.before : HY.snap();
+  // the step's «before» is the board now with only this card as it was (P4 S-22: the board at the opening took others' work back too)
+  let before = HY.snap(); if (w) { const b = JSON.parse(before); b.items[id] = w.pic; before = JSON.stringify(b); }
   Object.assign(it, { rv: res.rv, size: res.size, name: res.name || it.name, pics: res.pics || it.pics });
   if (res.doc) { it.doc = res.doc; it.render = res.render; it.v = res.v; }
   if (res.alpha) it.alpha = true; else delete it.alpha;
@@ -372,7 +488,9 @@ function renameStep() {
   const st = $("#cIfr"); if (!st || !ED) return; const s = st.querySelector(".ifn"), old = s.textContent;
   const inp = document.createElement("input"); inp.value = old; inp.spellcheck = false; s.textContent = ""; s.appendChild(inp); inp.focus(); inp.select();
   let fin = false; const done = ok => { if (fin) return; fin = true; const v = inp.value.trim(); s.textContent = ok && v ? v : old; if (ok && v && v !== old && ED) ED.win.__ed.setName(v); try { EDF.f.contentWindow.focus(); } catch {} };
-  inp.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); });
+  // a name: ↵ and Tab apply, Esc puts it back (owner decision 2026-10-10, Hyimg's one helper, ui/typing.js); ⌘↵ applies and saves
+  if (window.hyTyping && hyTyping.keys) hyTyping.keys(inp, { esc: "cancel", enter: "line", apply: () => done(true), cancel: () => done(false), primary: () => ED && ED.win.__ed.saveFrame() });
+  else inp.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); });
   inp.addEventListener("blur", () => done(true));
 }
 // the board's dock becomes the studio's: its tools, colours, zoom and Actions (studiodock.js; owner 2026-10-08, D3); its width eases from
@@ -428,6 +546,7 @@ function card(el, it, id) {
   const copy = !!id && isCopy(id, it); el.classList.toggle("ifcopy", copy); el.querySelector(".ifc").classList.toggle("mk-on", copy);
   dress(el, it);   // the colour grade over the render (grade.js)
   dressMask(el, it);   // the master mask (mask.js)
+  led(el, id);
   preload();
 }
 
@@ -443,7 +562,7 @@ function actions(ids) {
 }
 
 export function register(hy) {
-  HY = hy; t = translator(hy);
+  HY = hy; t = translator(hy); ANN = annHost(hy, () => ED);
   const st = document.createElement("style"); st.textContent = `
     /* frames are purple, not blue (owner 2026-10-05: «so it's clear what they are»): one token, a deeper one on the light theme */
     :root { --frame: #8b5cf6; } :root[data-theme=light] { --frame: #7c3aed; }
@@ -460,7 +579,9 @@ export function register(hy) {
        floats over the board (owner 2026-10-06: «opening the media library doesn't move the rulers»): the page stays where it is, so its
        rulers keep to the window's edges; it reads --inset from this root and moves only its tool rail and options bar out from under */
     .ifed { position: absolute; inset: 0; z-index: 1100; visibility: hidden; pointer-events: none; }
-    .ifed.on { visibility: visible; pointer-events: auto; }
+    .ifed.on { visibility: visible; pointer-events: auto; } .ifed.away { pointer-events: none !important; }   /* left, still writing */
+    .plg[data-type=${TYPE}] > hy-led.ifled, .it > hy-led.ifled { position: absolute; z-index: 6; top: calc(8px / var(--z)); right: calc(8px / var(--z));
+      width: calc(8px / var(--z)); height: calc(8px / var(--z)); pointer-events: auto; }
     .ifed iframe { display: block; width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; }
     /* the board around the open frame: the rest dims, its own chrome steps aside; the crumb and the dock stay over the editor */
     /* over the cards (z 2 as #items, later), under Hyimg's lift of the open frame (ui/editlift.js, z 3): its shadow lies over the dimmed board */
@@ -486,7 +607,7 @@ export function register(hy) {
     // ⌥⌘G one frame, ⌥⇧⌘G a frame each (⌘G stays the board's group); Enter opens a selected frame; while the editor covers the board
     // the board takes no keys
     onKey(e) {
-      if (ED) return true;
+      if (ED) { if (ED.win && !(window.hyTyping && (hyTyping(e) || hyTyping.ownKey(e)))) forward(e); return true; }
       if (PENDING && e.key === "Escape") { e.preventDefault(); PENDING = null; HY.modeChanged(); return true; }   // the studio was on its way
       if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === "KeyG") {
         const ids = [...HY.sel].filter(id => HY.board.items[id] || HY.board.groups[id]); if (!ids.length) return false;
@@ -529,6 +650,7 @@ export function register(hy) {
   });
   if (hy.bar) hy.bar(ids => actions(ids.filter(id => HY.board.items[id] || HY.board.groups[id])));
   registerGrade(hy);   // after the frame's own buttons on the bar and in the menu
+  if (hy.pic) hy.pic(it => { const s = sesOf(null, it.path); return s ? s.state : ""; }, (el, it, id) => led(el, id, it.path));   // a picture's LED
   registerMask(hy);
   // the image studio is a mode of the board's dock switch (owner 2026-10-06: «Board mode, Image mode, Dev mode and 3D studio»): chosen while
   // the frame editor is open, enabled when one frame or one picture is selected. A frame opens; a picture opens as a frame of its own that
@@ -537,9 +659,11 @@ export function register(hy) {
   // color: the chosen segment in the Studio's purple, not the board's blue (owner 2026-10-09: «вроде же бы в цвет режима должно быть?»)
   if (hy.mode) hy.mode("image", { label: t("Image"), name: t("Image Studio"), order: 10, icon: hyIcon("image", 16), color: "var(--frame)",
     title: t("Image Studio for the selected frame or image"), hint: t("Select one image or frame: Image Studio opens for it"),
+    hintStudio: t("Open an image or a frame to use Image Studio"),   // the tooltip while another Studio is open (owner decision 2026-10-10)
     isOpen: () => !!ED || !!PENDING, card: () => (ED && ED.id) || PENDING || null,   // the card Hyimg lifts while the studio is open
     target: ids => { const it = ids.length === 1 && HY.board.items[ids[0]]; return it && (isFrame(it) || canGo(it)) ? ids[0] : null; },
     async enter(id) {
+      if (SAVING.has(id)) return openSaving(id);   // its work on its way, or refused: that work
       if (isFrame(HY.board.items[id])) return openEditor(id);
       PENDING = id; HY.modeChanged();   // Image at once; the card shimmers while its frame is made
       const w = await wrapPic(id), go = PENDING === id; PENDING = null;
@@ -547,8 +671,23 @@ export function register(hy) {
       if (w) { unwrap(id, w); dropMem(); }
       HY.modeChanged();
     },
-    leave: () => { if (PENDING) { PENDING = null; HY.modeChanged(); return; } closeNow(); },
+    leave: () => { if (PENDING) { PENDING = null; HY.modeChanged(); return; } return closeNow(); },
+    // a page switch waits for the work still being written, and stays when a write was refused (its note comes again: «Open again»)
+    pending() {
+      const all = [...SAVING.values()], bad = all.filter(s => s.state === "failed");
+      if (bad.length) { bad.forEach(refused); return false; }
+      return all.length ? Promise.all(all.map(s => s.done)).then(r => r.every(Boolean)) : null;
+    },
+    unsaved: () => SAVING.size > 0 || !!(ED && ED.win && ED.win.hyEdK && ED.win.hyEdK.isDirty && ED.win.hyEdK.isDirty()),   // the browser asks before a reload
+    // the card between the studio's own panels as it opens (P4 S-61): the studio's own camera, ⌘0's fit; the Hint bar in its page (S-29)
+    fit: () => whenOpen(w => w.__ed.fitView()), primary: "Save", hints: [{ id: "brush", keys: ["b"], t: "frames::Brush" }, { id: "acts", keys: ["mod+k"], t: "frames::Actions" }],
+    showHint(items, ctx) {
+      let h = null, off = false;
+      const its = items.map(i => ({ ...i, t: HY.t ? HY.t(i.t) : i.t }));   // the board's words (the page's own T is a table of its own)
+      whenOpen(w => { if (!off && w.hyKeyHint) h = w.hyKeyHint.show(w.document.getElementById("obar") || w.document.body, ctx, its, { place: "top" }); });
+      return { hide() { off = true; if (h) h.hide(); }, used(id) { if (h) h.used(id); } };
+    },
   });
   if (Object.values(HY.board.items).some(isFrame)) preload();
-  window.__frames = { openEditor, makeFrames, explode, closeNow, get ED() { return ED; }, get EDF() { return EDF; }, picsOf, naturalSizes };
+  window.__frames = { openEditor, makeFrames, explode, closeNow, get ED() { return ED; }, get EDF() { return EDF; }, picsOf, naturalSizes, SAVING };
 }

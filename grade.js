@@ -279,7 +279,7 @@ export function registerGrade(hy) {
   addEventListener("keydown", e => {
     if (!P || e.key !== "Escape") return; const tg = e.target;
     if (P.inst.menuOpen) { e.preventDefault(); e.stopImmediatePropagation(); P.inst.closeMenu(); return; }   // Esc in the presets: the menu, its look put back
-    if (tg && (tg.tagName === "TEXTAREA" || tg.isContentEditable || (tg.tagName === "INPUT" && !/^(range|checkbox|radio|button)$/i.test(tg.type)))) return;
+    if (window.hyTyping ? window.hyTyping(e) : tg && (tg.tagName === "TEXTAREA" || tg.isContentEditable || (tg.tagName === "INPUT" && !/^(range|checkbox|radio|button)$/i.test(tg.type)))) return;
     e.preventDefault(); e.stopImmediatePropagation(); closePanel();
   }, true);
   // a gesture still waiting becomes its step before the board's undo or redo; a Hyimg without HY.history: at least before ⌘Z

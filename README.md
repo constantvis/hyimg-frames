@@ -20,7 +20,8 @@ A double click on a plain picture opens the same Image Studio, like Image in the
 - Raw Editor layers in the spirit of Camera Raw (also on any picture of the board, without opening Image Studio): white balance, tone, curves, color mixer, grading wheels; «Clear all» in the Raw Editor panel's menu and first on the master rows takes off everything applied (the board's «Clear properties ›»);
 - Select Subject and Remove Background through macOS Vision, about half a second;
 - Spot Healing and Content-Aware Fill with LaMa, running locally on the CPU (about 2.6 s per patch);
-- pictures dragged in from the library as new layers.
+- pictures dragged in from the library as new layers;
+- annotations on a layer: C or Annotation in the dock, a click drops a pin on the picked layer (or the one under the pointer), a drag marks an area. The pin is round, in the studio's purple, and follows the layer when it moves, turns or scales; the layer's row counts its open annotations. The thread is the board's: replies, @mentions, Resolve, `hy.py comments`, which names the layer.
 
 The originals are never written. A frame keeps links to its source files plus its own masks and painted layers, and Save renders it to a file the size of the document (up to 8000 × 8000 px). Every Save is a new version, so ⌘Z on the board really goes back. The last 10 versions are kept.
 
@@ -36,7 +37,7 @@ Put a page in the project folder at `html/<name>/index.html`. At rest the card s
 cd hyimg && ./scripts/install_plugins.sh --frames    # add --lama to download the fill model too
 ```
 
-Or by hand: clone this repository and run `ln -s <path to hyimg-image-studio> ~/Library/Application\ Support/Hyimg/plugins/frames`, then View › Restart server (⇧⌘R) in Hyimg.
+Or by hand: clone this repository and run `ln -s <path to hyimg-image-studio> ~/Library/Application\ Support/Hyimg/plugins/frames`, then View › Restart Server in Hyimg.
 
 What it needs:
 

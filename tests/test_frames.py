@@ -85,7 +85,12 @@ def test_frame_still_live_sizes_and_agent(hy):
         page.wait_for_function("() => board.items.h1.vw === 390 && Math.abs(board.items.h1.h - 720 * 844 / 390) < 1")
         page.wait_for_function("() => { const f = document.querySelector('.plg[data-id=h1] iframe.hfl'); return f.contentWindow.innerWidth === 390 }")
         # a typed size, then «Готово»: the viewport stays, a new still is made at it
-        page.fill(".hfbar [data-w]", "600"); page.press(".hfbar [data-w]", "Enter")
+        # W and H are round 16's scrub fields (owner 2026-10-10): the W letter dragged 10 px, the page is 10 px wider once let go
+        assert page.locator(".hfbar hy-scrub .hy-scrub-h").count() == 2
+        b = page.locator(".hfbar hy-scrub[data-w] .hy-scrub-h").bounding_box(); x, y = b["x"] + b["width"] / 2, b["y"] + b["height"] / 2
+        page.mouse.move(x, y); page.mouse.down(); page.mouse.move(x + 5, y); page.mouse.move(x + 10, y); page.mouse.up()
+        page.wait_for_function("() => board.items.h1.vw === 400")
+        page.fill(".hfbar [data-w] input", "600"); page.press(".hfbar [data-w] input", "Enter")
         page.wait_for_function("() => board.items.h1.vw === 600")
         vh = page.evaluate("() => Math.round(board.items.h1.vw * board.items.h1.h / board.items.h1.w)")
         page.click("hy-studio-actions [data-a=done]")

@@ -86,15 +86,16 @@ function goLive(id) {
   L.id = id; L.s = it.w / it.vw;
   card.classList.add("plg-live");
   const f = document.createElement("iframe"); f.className = "hfl"; f.title = it.name || it.src; f.src = libUrl(it.src); card.appendChild(f); L.frame = f;
-  // the page is ours (same origin): Esc inside it ends the live view too
-  f.addEventListener("load", () => { try { f.contentWindow.addEventListener("keydown", e => { if (e.key === "Escape") stop(); }); } catch {} });
+  // the page is ours (same origin): Esc inside it ends the live view too, unless one of its own fields has it (P4 S-35: Hyimg's one rule)
+  f.addEventListener("load", () => { try { const w = f.contentWindow; w.addEventListener("keydown", e => {
+    if (e.key === "Escape" && !e.defaultPrevented && !(window.hyTyping && hyTyping.field(e.composedPath ? e.composedPath()[0] : e.target)) && !(window.hyTyping && hyTyping.field(hyTyping.active(w.document)))) stop(); }); } catch {} });
   // a pinch over the page zooms the board, a click in it gives the page the zoom (Hyimg ui/framezoom.js, owner 2026-10-08)
   L.zoom = window.hyFrameZoom ? hyFrameZoom.attach(f, { card, local: true }) : null;
   L.bar = dockBar(); HY.dock(L.bar); sizeFrame(); HY.render();
   // Reload, Open in <Browser> and Done top right, as in every Studio (Hyimg ui/hy/actions.js; owner 2026-10-09: «кнопки Done у нас всегда
   // стандартизированы справа вверху»); the device sizes and the page's size stay in the dock
   L.acts = document.body.appendChild(document.createElement("hy-studio-actions"));
-  L.acts.actions = [{ id: "reload", label: t("Reload"), title: t("Reload page · ⌘R in the frame"), run: () => { if (L.frame) L.frame.src = L.frame.src; } },
+  L.acts.actions = [{ id: "reload", label: t("Reload"), title: t("Reload page"), run: () => { if (L.frame) L.frame.src = L.frame.src; } },
     { id: "open", open: () => (L.id && HY.board.items[L.id] ? libUrl(HY.board.items[L.id].src) : ""), tip: t("Open page in a new tab") },
     { id: "done", label: t("Done"), tip: t("Done"), key: "Esc", primary: true, run: () => stop() }];
 }
@@ -119,7 +120,8 @@ function preset(vw, vh) {
 function dockBar() {
   const b = document.createElement("div"); b.className = "hfbar";
   b.innerHTML = PRESETS.map(([n, w, h]) => `<button class="wide" data-pre="${w}x${h}" title="${t(n)}: ${w}×${h}">${t(n)}</button>`).join("")
-    + `<span class="sep"></span><label class="hfsz" title="${t("Page size in CSS pixels: type a number or drag the frame's edge")}"><input data-w inputmode="numeric" aria-label="${t("Page width")}">×<input data-h inputmode="numeric" aria-label="${t("Page height")}"></label>`
+    + `<span class="sep"></span><span class="hfsz" title="${t("Page size in CSS pixels: type a number or drag the frame's edge")}">`
+    + `<hy-scrub data-w label="W" min="200" max="4000" aria-label="${t("Page width")}"></hy-scrub><hy-scrub data-h label="H" min="200" max="8000" aria-label="${t("Page height")}"></hy-scrub></span>`
     + `<span class="hfe" title="${t("The engine changes for the whole app: ⚙ › Engine")}">${engineName()}</span>`;
   b.addEventListener("click", e => {
     const t = e.target.closest("button"); if (!t) return;
@@ -147,7 +149,7 @@ export function register(hy) {
     .hfbar button.on { background: var(--ink) !important; color: var(--panel) !important; }
     .hfbar .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
     .hfsz { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font: 500 12px var(--sans); }
-    .hfsz input { width: 52px; height: 28px; border: 1px solid var(--line); border-radius: 8px; background: var(--raise); color: var(--ink); font: 500 12px var(--sans); text-align: center; font-variant-numeric: tabular-nums; }
+    .hfsz hy-scrub { width: 76px; height: 28px; }   /* round 16's scrub: drag the W or H letter, a click types (owner 2026-10-10, ui/hy/scrub.js) */
     .hfe { padding: 0 8px; color: var(--muted); font: 500 12px var(--sans); white-space: nowrap; }`;
   document.head.appendChild(st);
   // a click anywhere else on the board ends the live page, as «Готово» does

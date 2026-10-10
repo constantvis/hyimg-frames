@@ -189,7 +189,7 @@ def test_master_raw_editor_and_mask_copy_to_the_board_and_back(hy):
         fr.wait_for_function("() => { const c = JSON.parse(localStorage.getItem('cv.propsClip') || 'null'); return c && c.kinds.mask && c.kinds.mask.file; }")
         mclip = json.loads(fr.evaluate("() => localStorage.getItem('cv.propsClip')"))["kinds"]["mask"]
         assert (lib / mclip["file"]).exists() and alpha_at(lib / mclip["file"], .25, .5) == 0 and alpha_at(lib / mclip["file"], .75, .5) == 255
-        fr.evaluate("() => { __ed.S.savedVer = __ed.S.ver; __ed.cancelFrame(); }")   # leave without the question about the changes
+        fr.evaluate("() => { __ed.S.savedVer = __ed.S.ver; __ed.S.savedTop = __ed.S.undo[__ed.S.undo.length - 1] || null; __ed.cancelFrame(); }")   # leave without the question about the changes
         closed(page)
         # on the board: ⌥⌘V puts the mask on a picture; then the Raw Editor, copied again, the same as the master's
         page.evaluate("() => { sel = new Set(['g1']); render(); }"); time.sleep(0.3)

@@ -92,10 +92,10 @@ def open_board(p, port, engine="chromium"):
 
 
 def editor(page):
-    page.wait_for_selector(".ifed.on iframe", state="attached", timeout=20000)
-    for _ in range(200):
-        fr = next((f for f in page.frames if "/editor/index.html" in f.url), None)
-        if fr: break
+    page.wait_for_selector(".ifed.on:not(.away) iframe", state="attached", timeout=20000)
+    for _ in range(200):   # the open studio's page, not one that left and still writes (awaywork.js)
+        el = page.query_selector(".ifed.on:not(.away) iframe"); fr = el and el.content_frame()
+        if fr and "/editor/index.html" in fr.url: break
         page.wait_for_timeout(50)
     fr.wait_for_function("() => window.__ed && __ed.ready && __ed.BM", timeout=30000)
     return fr
@@ -150,14 +150,16 @@ def test_frame_make_edit_save_undo_explode(hy, engine):
         assert oc.replace(" ", "") in ("rgb(139,92,246)", "rgb(124,58,237)"), oc
         assert "Открыть" in page.locator(".tidy").inner_text()
         shot(page, f"2-{engine}-board-frame-card.png")
-        # the editor in place: a double click; the camera stays, the crumb gains the frame, the dock is the editor's
+        # the editor in place: a double click; the camera fits the frame between the studio's panels (P4 S-61), the crumb gains the frame, the
+        # dock is the editor's
         page.wait_for_timeout(1200)   # the editor page loads ahead of time
         cam0 = page.evaluate("() => JSON.stringify(cam)")
         page.dblclick(f".plg[data-id='{fid}']")
         fr = editor(page)
         assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).length") == 2 and fr.evaluate("() => [__ed.W, __ed.H]") == [1000, 450]
         assert fr.evaluate("() => __ed.root.filter(n => !n.main && !n.mmask).every(n => n.orig && n.locks.pixels)")   # originals are locked bases
-        assert page.evaluate("() => JSON.stringify(cam)") == cam0
+        fr.wait_for_timeout(900)
+        assert fr.evaluate("() => { const V = __ed.V, s = document.getElementById('side').getBoundingClientRect(); return V.x > 40 && V.x + __ed.W * V.s <= s.left + 1; }"), "the frame is not between the studio's panels"
         assert page.evaluate("() => document.documentElement.classList.contains('ifedit') && document.querySelector('#cIfr').textContent.includes('Фрейм 1') && !!document.querySelector('#dock.plg-mode #ifActs')")
         # the notes stand under the app's top row in every mode (Hyimg ui/toasts.js, --hy-row-under): the editor moves nothing
         assert page.evaluate("() => getComputedStyle(document.documentElement).getPropertyValue('--toast-top').trim()") == ""
@@ -169,8 +171,9 @@ def test_frame_make_edit_save_undo_explode(hy, engine):
         time.sleep(0.6)
         shot(page, f"3-{engine}-editor-in-place.png")
         # the editor's zoom is the board's zoom
+        z1 = page.evaluate("() => cam.z")   # the studio's fit (P4 S-61)
         fr.evaluate("() => __ed.zoomTo(__ed.V.s * 1.25, null, null, false)"); page.wait_for_timeout(200)
-        assert abs(page.evaluate("() => cam.z") - json.loads(cam0)["z"] * 1.25) < 1e-6
+        assert abs(page.evaluate("() => cam.z") - z1 * 1.25) < 1e-6
         fr.evaluate("() => __ed.zoomTo(__ed.V.s / 1.25, null, null, false)"); page.wait_for_timeout(200)
         # a brush stroke over the first picture: the original is locked, so it goes onto a new layer above it
         v = fr.evaluate("() => ({ x: __ed.V.x, y: __ed.V.y, s: __ed.V.s })")

@@ -29,7 +29,7 @@
   K.baseDrop = (sel, t, copy) => (!copy && sel.some(n => n.base)) || !!(t && t.ref && t.ref.base && t.pos === 'below');
   K.baseWhy = n => (n && n.base ? W.why : '');
   // its row's padlock: shut, a mark and not a button (the eye drag over locks passes it by)
-  K.baseLock = () => `<span class="rb keep bse" data-tip="${W.why}" data-side="left">${window.hyLockIcon ? hyLockIcon(true, 14) : K.svg('lock', 14)}</span>`;
+  K.baseLock = () => `<span class="rb hy-ri keep bse" data-tip="${W.why}" data-side="left">${window.hyLockIcon ? hyLockIcon(true, 14) : K.svg('lock', 14)}</span>`;
   const css = document.createElement('style');
   css.textContent = '.lr .rb.bse{cursor:default}.lr .rb.bse:hover{background:none;color:var(--sub)}';
   document.head.append(css);

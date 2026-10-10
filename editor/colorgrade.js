@@ -1267,13 +1267,13 @@ void main(){
       if (opts.onBeforeAfter) opts.onBeforeAfter(!!b);
     }
     on(baBtn, 'click', () => setBefore(!state.bypass));
-    on(window, 'keydown', e => {
-      if (e.key === 'Escape' && menu.classList.contains('open')) closeMenu();
+    on(window, 'keydown', e => {   // first (capture): an Esc that closes the menu goes no further, the studio stays (P4 S-11)
+      if (e.key === 'Escape' && menu.classList.contains('open')) { closeMenu(); e.preventDefault(); e.stopImmediatePropagation(); return; }
       if (e.key !== '\\' || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       e.preventDefault(); setBefore(!state.bypass);
-    });
+    }, true);
 
     const scroll = el('div', 'hcg-scroll');
     root.appendChild(scroll);
@@ -1822,7 +1822,7 @@ void main(){
         Object.values(picks).forEach(b => b.classList.remove('on'));
         if (!quiet && typeof p.cancel === 'function') p.cancel();
       }
-      on(window, 'keydown', e => { if (picking && e.key === 'Escape') stopPick(); });
+      on(window, 'keydown', e => { if (picking && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); stopPick(); } }, true);   // P4 S-11
       function applyPick(rgb, mode) {
         if (isCol()) return;
         const [h, s] = rgb2hsl(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255); if (!(s > 0)) return;   // a grey has no hue: no range to take

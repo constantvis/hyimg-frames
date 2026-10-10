@@ -83,7 +83,7 @@ def test_double_click_on_a_picture_opens_the_image_mode(hy, engine):
         fr = editor(page)
         fr.click("#topr [data-a=save]")
         page.wait_for_function("() => board.items.a1.type === 'imgframe' && board.items.a1.v === 1", timeout=60000)
-        closed(page)
+        closed(page); page.wait_for_timeout(700)   # the camera glides back from the studio's fit (P4 S-61)
         assert page.evaluate("() => [...sel]") == ["a1"] and page.evaluate("() => past.length") == steps0 + 1
         assert near(page.evaluate(CAM), cam0)
         page.wait_for_function("() => !dirty", timeout=10000)

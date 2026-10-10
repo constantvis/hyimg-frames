@@ -28,6 +28,10 @@ const STYLE = `
   #dock .plgdock button.ifg:hover .fm, #dock .plgdock button.ifg.on .fm { opacity: .9; }
   #dock .plgdock button.ifg.press { transform: scale(.92); }
   #dock .plgdock button.ifg.open8 { box-shadow: 0 0 0 2px color-mix(in srgb, var(--frame) 55%, transparent) !important; }
+  /* Annotation, a tool of its own after the groups (owner 2026-10-09, round 15's r15-image.html): the groups' look, no list */
+  #dock .plgdock button.ifann { width: 36px; padding: 0 !important; justify-content: center; background: transparent !important; flex: none; }
+  #dock .plgdock button.ifann:hover { background: var(--raise) !important; }
+  #dock .plgdock button.ifann.on { background: var(--frame) !important; color: var(--hy-on-accent) !important; }
   /* the two colours: the front square the foreground, the back one the background */
   #dock .plgdock .ifcol { position: relative; width: 34px; height: 34px; flex: none; }
   #dock .plgdock .ifcol button { position: absolute; width: 14px; height: 14px !important; min-width: 0; padding: 0 !important; border-radius: 4px !important;
@@ -62,7 +66,8 @@ export function studioDock({ t, win, K, zoom, acts }) {
   node.innerHTML = G.map(g => { const multi = g.tools.length > 1, x = g.tools[0];
     return `<button class="ifg${multi ? " multi" : ""}" data-g="${g.id}" data-t="${x.id}" aria-haspopup="${multi ? "menu" : "false"}">${ic(x.id, 17)}`
       + (multi ? `<i class="fm" title="${esc(t("Hold, or click here: the other tools"))}"></i>` : "") + `</button>`; }).join("")
-    + `<span class="sep"></span><span class="ifcol" role="group" aria-label="${esc(t("Colors"))}">`
+    + `<button class="ifann" data-t="comment" aria-pressed="false" title="${esc(t("Annotation: a layer or a spot · C"))}" aria-label="${esc(t("Annotation"))}">`
+    + `${ic("comment", 17)}</button><span class="sep"></span><span class="ifcol" role="group" aria-label="${esc(t("Colors"))}">`
     + `<button class="fg" title="${esc(t("Foreground color") + " · " + t("X swaps, D resets"))}"></button>`
     + `<button class="bg" title="${esc(t("Background color") + " · " + t("X swaps, D resets"))}"></button><input type="color" tabindex="-1" aria-hidden="true"></span>`
     + `<span class="sep"></span>`;
@@ -75,7 +80,11 @@ export function studioDock({ t, win, K, zoom, acts }) {
     const tip = x.name + (x.keys.length ? " · " + keyText(x) : "") + (b.classList.contains("multi") ? " · " + t("hold and drag up for the others") : "");
     b.title = tip; b.setAttribute("aria-label", x.name);
   }
+  const annB = node.querySelector("button.ifann");   // Annotation: C in the studio, again or Esc gives the tool before it back (editor/annwork.js)
+  annB.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); });
+  annB.addEventListener("click", e => { e.stopPropagation(); D.setTool(D.tool() === "comment" ? (K.annBack ? K.annBack() : "select") : "comment"); sync(D.tool()); back(); });
   function sync(id) {
+    annB.classList.toggle("on", id === "comment"); annB.setAttribute("aria-pressed", String(id === "comment"));
     const [g] = toolOf(id);
     btns.forEach(b => { const on = !!g && b.dataset.g === g.id; if (on && b.dataset.t !== id) show(b, id); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   }

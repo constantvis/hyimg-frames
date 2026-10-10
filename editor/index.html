@@ -9,7 +9,7 @@
 <script src="/ui/icons.js"></script>      <!-- the editors' one icon family (owner 2026-10-06): the tools look the same here and in the 3D studio -->
 <script src="/ui/split.js"></script>      <!-- the app's one splitter between panel sections, also the 3D studio's layer list -->
 <script src="/ui/eyedrag.js"></script>    <!-- Photoshop's eye drag: the eyes and locks of Layers and the Raw Editor's section eyes (owner 2026-10-07) -->
-<script src="/ui/keyhints.js"></script>   <!-- a tool's key as a <kbd> on its button, shown only while ⌘ is held (owner 2026-10-05) -->
+<script src="/ui/typing.js"></script><script src="/ui/keyhints.js"></script>   <!-- no key while typing (2026-10-10); a tool's key as a <kbd> under ⌘ (2026-10-05) -->
 <script src="/ui/slider.js"></script>     <!-- the app's one slider, the 3D editor's look (owner 2026-10-06: sliders must be the same everywhere) -->
 <link rel="stylesheet" href="/ui/tokens.css"><link rel="stylesheet" href="/ui/hy/hy.css">   <!-- the app's tokens (the palette, heights, corners) and primitives -->
 <link rel="stylesheet" href="/ui/look.css"><link rel="stylesheet" href="/ui/slider.css">   <!-- the app's plates: their shadow (--plate-sh by data-shadow and the theme), corners by data-shape, menus, key caps -->
@@ -141,7 +141,7 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--hy-gap-ctl)}
 .nf{display:flex;align-items:center;height:28px;border-radius:var(--r-ctl);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line);padding:0 10px;gap:6px;transition:box-shadow .2s var(--ease)}
 .nf:focus-within{box-shadow:inset 0 0 0 1px var(--sel)}
-.nf .nl{color:var(--muted);cursor:ew-resize;font-size:12px;flex:none}
+.nf .nl{color:var(--muted);font-size:12px;flex:none}   /* a handle to scrub: ui/hy/scrub.css .hy-scrub-h */
 .nf input{flex:1;min-width:0;width:100%;background:transparent;border:0;outline:0;color:var(--ink);font-variant-numeric:tabular-nums;font-size:12.5px}
 .nf .nu{color:var(--muted);font-size:12px}
 .hy-slider{--hy-sl-h:28px;font-size:12.5px}   /* the app's one slider (ui/slider.css) at the panel's row height */
@@ -238,14 +238,13 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 .chr .ck{margin-left:auto;display:flex;gap:3px}
 .chr .muted{font-size:12px}
 
-
 .lh{display:flex;align-items:center;gap:8px;padding:2px 12px 8px}
 .lh b{font-weight:600}
 .lset{padding:2px 10px 6px;display:flex;flex-direction:column;gap:var(--hy-gap-ctl)}
 .lset .row{gap:var(--hy-gap-ctl)}
 .lset .selb{flex:1}
 .mini{display:flex;align-items:center;gap:4px;height:28px;border-radius:var(--r-ctl);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line);padding:0 9px;flex:none;min-width:118px}   /* as wide as its word needs: «Прозрачность» in Russian */
-.mini .nl{color:var(--muted);font-size:12px;cursor:ew-resize}
+.mini .nl{color:var(--muted);font-size:12px}
 .mini input{width:27px;background:transparent;border:0;outline:0;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px}
 .mini .nu{color:var(--muted);font-size:12px}
 .lset.off .selb,.lset.off .mini{opacity:.4;pointer-events:none}
@@ -295,13 +294,11 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 .lr .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
 .lr .nm.base{text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--muted)}
 .lr .nm input{width:100%;background:var(--raise);border:0;outline:0;border-radius:var(--r-in);box-shadow:inset 0 0 0 1px var(--sel);padding:3px 7px;color:var(--ink);font-size:12.5px}
-.lr .rb{width:22px;height:22px;border-radius:var(--r-ctl);display:grid;place-items:center;color:var(--sub);opacity:0;flex:none;transition:opacity .18s var(--ease),background .15s,color .15s}
-.lr:hover .rb,.lr .rb.keep{opacity:1}
+/* a row's lock, eye and frame switch show on hover, a set one stays: round 15's .hy-hovrow / .hy-ri (owner 2026-10-09, r15-micro.html, ui/hy/micro.css) */
 .lr.ghid .tb2,.lr.ghid .nm,.lr.ghid .fic{opacity:.55}   /* under a hidden group: dimmed, a step lighter than its own hidden (.hid) */
 .lr .rb.inh,.lr:hover .rb.inh{opacity:.42}   /* the group's eye or lock, faint beside the row's own */
 #pbody .why{margin:10px 12px 2px;display:flex;align-items:center;gap:6px}
 #pbody .sec.dis .sbi{opacity:.42;pointer-events:none;filter:saturate(0)}   /* a locked layer's settings, or under a locked or hidden group: grey, nothing changes */
-.lr .rb:hover{background:var(--hover);color:var(--ink)}
 .lr .lkd{color:var(--muted);flex:none}
 .lki{position:relative;width:14px;height:14px;display:block}
 .lki svg{position:absolute;inset:0;transition:opacity .22s var(--ease),transform .34s var(--ease)}
@@ -408,7 +405,7 @@ body{--rul:18px}   /* the rulers' room is kept whether they show or not (owner 2
 @keyframes shk{20%{transform:translateX(-4px)}45%{transform:translateX(4px)}70%{transform:translateX(-2px)}}
 .xff{display:flex;align-items:center;gap:5px;height:28px;width:auto;flex:none;border-radius:var(--r-ctl);background:var(--raise);box-shadow:inset 0 0 0 1px var(--line);padding:0 10px;margin:0 2px;transition:box-shadow .2s var(--ease)}
 .xff:focus-within{box-shadow:inset 0 0 0 1px var(--sel)}
-.xff .xfl{color:var(--muted);font-size:12px;cursor:ew-resize;flex:none}
+.xff .xfl{color:var(--muted);font-size:12px;flex:none}
 .xff input{flex:none;width:44px;background:transparent;border:0;outline:0;color:var(--ink);font-size:12.5px;font-variant-numeric:tabular-nums}
 .xff .xfu{color:var(--muted);font-size:11.5px;flex:none}
 .xsp{width:4px}
@@ -533,7 +530,6 @@ body.nt #crumb,body.nt #crumb *{transition:none!important}
 .whr{display:flex;align-items:center;gap:6px}
 .whr .nf{flex:1;min-width:0}
 .whr .btn{width:34px;padding:0;flex:none}
-.scrub{cursor:ew-resize}
 .tb2.moff:before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(45deg,transparent 46%,var(--red) 46% 54%,transparent 54%)}
 #dlg .dbtns .dsp{flex:1}
 body.nokeys #tip .kc{display:none}
@@ -567,6 +563,7 @@ body.nokeys #tip .kc{display:none}
 .hsnap svg{color:var(--sel)}
 /* frames in the Layers panel */
 .lr .rb.inc{color:var(--sel)}
+.lr>hy-led{margin:0 4px}
 .lr .rb.inc.off{color:var(--muted);opacity:.55}
 .tb2.frm{background:var(--raise)}
 .tabs.meas .tl{transition:none!important}
@@ -640,7 +637,7 @@ body.nokeys #tip .kc{display:none}
 
 <aside id="side">
   <section class="pg hy-blk" id="g1" data-g="g1">
-    <div class="tabs hy-bh"><button class="tab hy-bh-tab" data-t="props"></button><button class="tab hy-bh-tab" data-t="adj"></button><button class="tab hy-bh-tab" data-t="hist"></button><button class="tab hy-bh-tab" data-t="gen"></button><span class="sp"></span><button class="gm hy-bh-btn"></button></div>
+    <div class="tabs hy-bh"><button class="tab hy-bh-tab" data-t="props"></button><button class="tab hy-bh-tab" data-t="adj"></button><button class="tab hy-bh-tab" data-t="hist"></button><button class="tab hy-bh-tab" data-t="ann"></button><button class="tab hy-bh-tab" data-t="gen"></button><span class="sp"></span><button class="gm hy-bh-btn"></button></div>
     <div class="pgb">
       <div class="pane" data-p="props" id="props"><div id="pbody"></div></div>
       <div class="pane" data-p="adj" id="padj"></div>
@@ -722,7 +719,7 @@ const T = hyEdTr({   // in the board's language (i18n.js, the words in lang.js)
   studioActs: 'Studio actions',
   rename: 'Rename', docSize: 'Document Size', reveal: 'Reveal on Board', wouldOpen: w => `Opens ${w}`,
   saveQ: n => `Save changes to "${n}"?`, saveQNote: 'Your changes are lost if you leave without saving.', dontSave: "Don't Save",
-  discardQ: 'Close without saving?', discardNote: 'The changes made since the last save will be lost.', discard: 'Discard',
+  discardQ: 'Close without saving?', discardNote: 'The changes made since the last save will be lost.', discard: 'Discard', keepEditing: 'Keep editing',
   paper: 'Paper', paperDefault: 'Graphite', paperDeep: 'Black', paperLight: 'Slate', interface: 'Interface', showKeyTips: 'Shortcuts in tooltips',
   paperNote: 'Follows the board\'s <b>Paper</b> setting',
   // dock and Actions
@@ -752,17 +749,17 @@ const T = hyEdTr({   // in the board's language (i18n.js, the words in lang.js)
   newGuide: 'New Guide', clearGuides: 'Clear Guides', maskOverlay: 'Mask Overlay', horizontal: 'Horizontal', vertical: 'Vertical', position: 'Position',
   extrasOn: 'Extras shown', extrasOff: 'Extras hidden, ⌘H shows them', filmNeedsMask: 'The overlay shows on a layer with a mask',
   // tools
-  tool: { select: 'Select Tool', move: 'Move Tool', lasso: 'Lasso Tool', marquee: 'Rectangular Marquee Tool', ellipse: 'Elliptical Marquee Tool', wand: 'Magic Wand Tool', brush: 'Brush Tool', patch: 'Spot Healing Brush Tool', pick: 'Eyedropper Tool', hand: 'Hand Tool' },
+  tool: { select: 'Select Tool', move: 'Move Tool', lasso: 'Lasso Tool', marquee: 'Rectangular Marquee Tool', ellipse: 'Elliptical Marquee Tool', wand: 'Magic Wand Tool', brush: 'Brush Tool', patch: 'Spot Healing Brush Tool', pick: 'Eyedropper Tool', hand: 'Hand Tool', comment: 'Annotation' },
   selectionTools: 'Selection tools', healingTools: 'Healing tools',
   fgColor: 'Foreground color', bgColor: 'Background color', swapColors: 'Switch colors', defaultColors: 'Default colors',
   blackHides: 'Black conceals', whiteReveals: 'White reveals',
   // panels
-  panel: { layers: 'Layers', props: 'Properties', adj: 'Adjustments', hist: 'History', chan: 'Channels', gen: 'Generative' },
+  panel: { layers: 'Layers', props: 'Properties', adj: 'Adjustments', hist: 'History', chan: 'Channels', gen: 'Generative', ann: 'Annotations' },
   groupMenu: 'Panel group menu', splitTip: 'Drag to change the height, past the edge to fold, double-click for halves', expandGroup: 'Expand', collapseGroup: 'Collapse', dblClick: 'double-click',
   presetsNote: 'A preset sets the <b>Raw Editor</b> on top', presetOn: n => `Raw Editor: ${n}`, newGradeLayer: 'New Raw Editor layer', presets: 'Presets', noPresets: 'No presets: the Raw Editor module is not loaded',
   histSteps: n => `${n} ${n === 1 ? 'step' : 'steps'}`, red: 'Red', green: 'Green', blue: 'Blue', maskOf: n => `${n} Mask`,
   // layers panel
-  paintMask: 'Paint on the mask; ⇧-click turns it off', linkedTip: 'Linked with other layers', generativeLayer: 'Generative layer', lockedTip: 'Locked, click to unlock', showHide: 'Show or hide',
+  paintMask: 'Paint on the mask; ⇧-click turns it off', linkedTip: 'Linked with other layers', generativeLayer: 'Generative layer', genLedRun: 'Generating', genLedErr: 'The generation failed', lockedTip: 'Locked, click to unlock', showHide: 'Show or hide',
   blendMode: 'Blending mode', opacity: 'Opacity', opacityTip: 'Layer opacity', lockTip: 'Lock', lockedSelf: 'Locked', lockedByGroup: 'Locked by its group', hiddenByGroup: 'Hidden by its group',
   layerStyle: 'Add a layer style', dropShadow: 'Drop Shadow', stroke: 'Stroke', outerGlow: 'Outer Glow', addMask: 'Add layer mask',
   blend: { normal: 'Normal', pass: 'Pass Through', darken: 'Darken', multiply: 'Multiply', lighten: 'Lighten', screen: 'Screen', overlay: 'Overlay', softLight: 'Soft Light', hardLight: 'Hard Light',
@@ -832,7 +829,7 @@ const T = hyEdTr({   // in the board's language (i18n.js, the words in lang.js)
     opacity: 'Opacity Change', lock: 'Lock Layer', size: 'Resize', flip: 'Flip Layer', density: 'Mask Density', maskFeather: 'Mask Feather', grade: 'Raw Editor',
     invertMask: 'Invert Mask', bgc: 'Background Color', decontaminate: 'Decontaminate Colors', c2a: 'Color to Alpha', background: 'Document Background', align: 'Align', mask: 'Layer Mask',
     xf: 'Free Transform', xfSel: 'Free Transform Selection', deleteMask: 'Delete Layer Mask', include: 'Shared Adjustments', restoreSnap: 'Snapshot',
-    pasteMask: 'Paste Mask', maskFromAlpha: 'Mask from Alpha', maskFromSel: 'Mask from Selection' }
+    pasteMask: 'Paste Mask', maskFromAlpha: 'Mask from Alpha', maskFromSel: 'Mask from Selection', renameFrame: 'Rename Frame', prompt: 'Generative Prompt' }
 });
 // One rule for every number typed in the editor (owner 2026-10-05: «1239px + 10 = 1249px, 100px + 10% = 110px»). A plain number sets
 // the value: 800, 800px; 50% is a share of the field's base (the document's size for W and H). Text that starts with + - * / works on
@@ -929,14 +926,15 @@ const TOOLS = [
   { id: 'brush', name: T.tool.brush, key: 'B', code: 'KeyB' },
   { id: 'patch', name: T.tool.patch, key: 'J', code: 'KeyJ' },
   { id: 'pick', name: T.tool.pick, key: 'I', code: 'KeyI' },
-  { id: 'hand', name: T.tool.hand, key: 'H', code: 'KeyH' }
+  { id: 'hand', name: T.tool.hand, key: 'H', code: 'KeyH' },
+  { id: 'comment', name: T.tool.comment, key: 'C', code: 'KeyC' }   // an annotation on a layer or a spot (annwork.js, owner 2026-10-09)
 ];
 
 /* ================= state ================= */
 let W = 3000, H = 3750, BG = '#ffffff';
 let root = [];
 const S = {
-  tool: 'select', ver: 0, savedVer: 0, ids: [], anchor: null, editMask: false, fg: '#000000', bg: '#ffffff', space: false,
+  tool: 'select', ver: 0, savedVer: 0, savedTop: null, burst: null, ids: [], anchor: null, editMask: false, fg: '#000000', bg: '#ffffff', space: false,
   brush: { size: 140, hard: 70, opac: 100, flow: 100 }, pressure: true, selo: { feather: 0, smooth: true, mode: 'new' }, autoSel: true,
   patch: { size: 180, hard: 80, mode: 'ca' }, pst: null, pend: null, patchSeq: 1,
   hasSel: false, selV: 0, rulers: true, extras: true, gl: [], showGuides: true, lockGuides: false, snap: true, snapHi: null, hoverRow: null, undo: [], redo: [], pending: null, dirty: true, odirty: true, thumbs: true, moved: false,
@@ -1613,11 +1611,11 @@ function updCursor() {
 
 /* ================= history ================= */
 function cloneNode(n) { const m = { ...n, locks: { ...n.locks } }; if (n.mask) m.mask = { ...n.mask }; if (n.gen) m.gen = { ...n.gen }; if (n.children) m.children = n.children.map(cloneNode); return m; }
-const snapshot = () => { pvEnd(); if (S.adjPv) S.adjPv.end(false); return { tree: root.map(cloneNode), W, H, BG }; };   // a preset pointed at in Adjustments is not a state to keep
+const snapshot = () => { pvEnd(); if (S.adjPv) S.adjPv.end(false); return { tree: root.map(cloneNode), W, H, BG, ids: [...S.ids], name: FR.name }; };   // ids, name: P4 S-51, S-48   // a preset pointed at in Adjustments is not a state to keep
 function restore(st) {
   const cur = snapshot(); root = st.tree; const sized = W !== st.W || H !== st.H; W = st.W; H = st.H; BG = st.BG;
   if (sized) { S.hasSel = false; ensureSel(); fit(true); }
-  S.ids = S.ids.filter(id => locate(id)); if (!S.ids.length) { const f = allPixels().pop(); if (f) S.ids = [f.id]; }
+  S.ids = (st.ids || S.ids).filter(id => locate(id)); if (!S.ids.length) { const f = allPixels().pop(); if (f) S.ids = [f.id]; } if (st.name && st.name !== FR.name) nameTo(st.name);
   return cur;
 }
 function pushHist(e) { S.ver++; if (e.who == null) { const o = one(); e.who = o ? (o.frames ? '' : o.name) : ''; } S.undo.push(e); if (S.undo.length > 40) S.undo.shift(); S.redo.length = 0; updHist(); }
@@ -1893,6 +1891,9 @@ function toast(text, icon = 'check') { if (K.note && K.note(text, icon)) return;
 
 // One rule for every number field in the editor (parseExpr above): 800 sets, +10 adds, -10 takes away, +10% adds a tenth, *2, /2,
 // 1239+10, 0-10 for an exact negative; parsed on Enter, Tab and blur; a wrong entry shakes and goes back; ↑ ↓ step by 1, with ⇧ by 10; drag the label to scrub
+// presses of ↑ ↓ in a row (under 0.8 s apart, nothing else between) are one step (P4 S-38)
+function burst(label, fn) { const top = S.undo[S.undo.length - 1], now = performance.now(); if (label && S.burst && S.burst.e === top && now - S.burst.t < 800) { fn(); S.ver++; S.burst.t = now; return; }
+  if (label) beginEdit(label); fn(); endEdit(); S.burst = label ? { e: S.undo[S.undo.length - 1], t: now } : null; }
 function numIn(inp, o, box, lab) {
   inp.spellcheck = false; inp.autocomplete = 'off'; inp.inputMode = 'decimal';
   inp.title = (o.min ?? 0) < 0 ? T.numTipSigned : T.numTip;
@@ -1910,21 +1911,15 @@ function numIn(inp, o, box, lab) {
   inp.addEventListener('input', () => { dirty = true; });
   inp.addEventListener('focus', () => setTimeout(() => inp.select(), 0));
   inp.addEventListener('change', commit); inp.addEventListener('blur', commit);
-  inp.addEventListener('keydown', e => {
-    e.stopPropagation();
-    if (e.key === 'Enter') { e.preventDefault(); commit(); inp.blur(); }
-    else if (e.key === 'Escape') { e.preventDefault(); dirty = false; show(true); inp.blur(); }
-    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+  hyTyping.keys(inp, { esc: 'cancel', enter: 'line', tab: 'own', apply: () => { commit(); inp.blur(); }, cancel: () => { dirty = false; show(true); inp.blur(); }, primary: () => saveFrame(),
+    key: e => { if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       e.preventDefault(); dirty = false; const d = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1) * (o.arrow || 1);
-      if (o.hist) beginEdit(o.hist); put(o.get() + d); endEdit(); if (o.done) o.done(); show(true); inp.select();
-    }
-  });
-  if (lab) {
-    lab.classList.add('scrub'); let sx = null, sv = 0;
-    lab.addEventListener('pointerdown', e => { if (o.can && !o.can()) return; e.preventDefault(); lab.setPointerCapture(e.pointerId); sx = e.clientX; sv = o.get(); if (o.hist) beginEdit(o.hist); });
-    lab.addEventListener('pointermove', e => { if (sx === null) return; put(sv + (e.clientX - sx) * (o.step || 1)); show(true); if (o.live) o.live(); });
-    const up = () => { if (sx === null) return; sx = null; endEdit(); if (o.done) o.done(); };
-    lab.addEventListener('pointerup', up); lab.addEventListener('pointercancel', up);
+      burst(o.hist, () => put(o.get() + d)); if (o.done) o.done(); show(true); inp.select(); } });
+  if (lab) {   // the label is the handle: round 16's scrub (owner 2026-10-10, r16-scrub.html A: ⇧ ×10, ⌥ ×0.1, Esc puts it back; ui/hy/scrub.js)
+    const go = () => hyScrub(lab, { get: o.get, set: v => { put(v); show(true); if (o.live) o.live(); }, step: o.step || 1, min: o.min, max: o.max, field: box,
+      can: () => !o.can || o.can(), begin: () => { if (o.hist) beginEdit(o.hist); }, end: () => { endEdit(); if (o.done) o.done(); },
+      cancel: () => { S.pending = null; if (o.done) o.done(); }, click: () => inp.focus() });   // one history step a drag, none when Esc put it back
+    if (window.hyScrub) go(); else customElements.whenDefined('hy-scrub').then(go);
   }
   show(true); return { sync: () => show(false) };
 }
@@ -2015,16 +2010,28 @@ addEventListener('keydown', e => { if (menuPV && !['ArrowUp', 'ArrowDown', 'Ente
 document.addEventListener('pointerdown', e => { if (!e.target.closest('.menu')) closeMenu(); }, true);
 
 /* ---- dialog ---- */
-const dlgw = $('#dlgw'), dlg = $('#dlg'); let dlgOk = null, dlgAlt = null;
+const dlgw = $('#dlgw'), dlg = $('#dlg'); let dlgOk = null, dlgAlt = null, dlgBack = null; dlgw.inert = true;
 function openDialog(title, icon, build, ok, o = {}) {
+  dlgBack = document.activeElement; dlgw.inert = false;
   dlg.innerHTML = `<div class="dt">${svg(icon, 16)}<span>${title}</span></div><div class="dbd"></div><div class="dbtns">${o.alt ? `<button class="btn" data-a="alt">${o.alt}</button><span class="dsp"></span>` : ''}<button class="btn" data-a="no">${T.cancel}</button><button class="btn ok" data-a="ok">${o.ok || T.ok}</button></div>`;
   build(dlg.querySelector('.dbd')); dlgOk = ok; dlgAlt = o.altFn || null; dlgw.classList.add('on');
   const f = dlg.querySelector('input'); setTimeout(() => { if (f) { f.focus(); f.select(); } else dlg.querySelector('[data-a=ok]').focus(); }, 60);
 }
-function closeDialog() { dlgw.classList.remove('on'); dlgOk = null; dlgAlt = null; }
+function closeDialog() {   // inert, the focus back where it was: the keys work at once (P4 S-10: dead until a click)
+  dlgw.classList.remove('on'); dlgOk = null; dlgAlt = null; dlgw.inert = true; const a = document.activeElement, b = dlgBack;
+  if (dlgw.contains(a)) { if (b && b.isConnected && b !== document.body && b.focus) b.focus(); else a.blur(); } }
 dlg.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (!a) return; const f = a.dataset.a === 'ok' ? dlgOk : a.dataset.a === 'alt' ? dlgAlt : null; closeDialog(); if (f) f(); });
 dlgw.addEventListener('pointerdown', e => { if (e.target === dlgw) closeDialog(); });
-addEventListener('keydown', e => { if (!dlgw.classList.contains('on')) return; if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); const i = document.activeElement; if (i && i.tagName === 'INPUT') i.dispatchEvent(new Event('change')); dlg.querySelector('[data-a=ok]').click(); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeDialog(); } }, true);
+// open, it takes the keys: ↵ the button with the focus (else OK), Esc closes, Tab stays inside, ⌘↵ and every key outside it wait (P4 S-03)
+addEventListener('keydown', e => {
+  if (!dlgw.classList.contains('on')) return; const i = document.activeElement, inside = dlg.contains(i), mod = e.metaKey || e.ctrlKey;
+  if (e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); if (mod) return; const b = inside && i.closest('button[data-a]'); if (b) return b.click();
+    if (i && i.tagName === 'INPUT') i.dispatchEvent(new Event('change')); dlg.querySelector('[data-a=ok]').click(); }
+  else if (e.key === 'Escape') { if (document.documentElement.classList.contains('hy-scrub-drag')) return; e.preventDefault(); e.stopImmediatePropagation(); closeDialog(); }   // S-47
+  else if (e.key === 'Tab') { const f = [...dlg.querySelectorAll('input, button, select, textarea')].filter(x => !x.disabled); if (!f.length) return;
+    const k = f.indexOf(i); if (e.shiftKey ? k <= 0 : k === f.length - 1 || k < 0) { e.preventDefault(); f[e.shiftKey ? f.length - 1 : 0].focus(); } }
+  else if (!inside || mod) { if (!inside) e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
 function sizeDialog(kind) {
   const v = { w: W, h: H, lock: true, ax: .5, ay: .5 }, r0 = W / H;
   openDialog(kind === 'canvas' ? T.canvasSize : T.imageSize, kind === 'canvas' ? 'canvas' : 'resize', b => {
@@ -2143,11 +2150,12 @@ const rail = $('#rail'), railHl = rail.querySelector('.hl');
 const GROUPS = [
   { id: 'gselect', name: T.tool.select, tools: ['select'] },
   { id: 'gmove', name: T.tool.move, tools: ['move'] },
-  { id: 'gsel', name: T.selectionTools, tools: ['lasso', 'marquee', 'ellipse', 'wand'] },
+  { id: 'gsel', name: T.selectionTools, tools: ['marquee', 'ellipse', 'lasso', 'wand'] },   // the dock's order (P4 S-54)
   { id: 'gbrush', name: T.tool.brush, tools: ['brush'] },
   { id: 'gheal', name: T.healingTools, tools: ['patch'] },
   { id: 'gpick', name: T.tool.pick, tools: ['pick'] },
-  { id: 'ghand', name: T.tool.hand, tools: ['hand'] }
+  { id: 'ghand', name: T.tool.hand, tools: ['hand'] },
+  { id: 'gcomment', name: T.tool.comment, tools: ['comment'] }
 ];
 GROUPS.forEach(g => g.last = g.tools[0]);
 const groupOf = id => GROUPS.find(g => g.tools.includes(id));
@@ -2241,6 +2249,8 @@ addEventListener('paste', e => { if (e.target.closest && e.target.closest('input
 /* ================= layers panel ================= */
 const rowsEl = $('#rows'), listEl = $('#list'), insEl = $('#ins'), clipH = $('#cliph');
 clipH.querySelector('span').innerHTML = svg('clip', 12, 2.4);
+// a generative layer's LED (round 15, owner 2026-10-09 on r15-micro.html: ui/hy/led.js): blinking purple while it generates, a ring when it failed
+const genLed = st => `<hy-led state="${st === 'run' ? 'busy' : 'off'}" title="${st === 'run' ? T.genLedRun : T.genLedErr}"></hy-led>`;
 function rowHTML(n, depth, ih, il) {   // ih, il: a group above it is hidden, locked
   const sel = S.ids.includes(n.id), isB = !n.clip && (() => { const l = locate(n.id); const up = l.list[l.i + 1]; return up && up.clip; })();
   const ind = `<span class="ind" style="width:${depth * 14 + (n.clip ? 10 : 0)}px"></span>`;
@@ -2251,11 +2261,12 @@ function rowHTML(n, depth, ih, il) {   // ih, il: a group above it is hidden, lo
   else lead = `<span class="clp">${n.clip ? svg('clipped', 12, 2.2) : ''}</span>` + (n.type === 'adjust' ? `<span class="tb2 adj">${svg('adj', 15)}</span>` + (n.mask ? mthumb(false) : '') :
     `<span class="tb2 pix ${sel && !S.editMask ? 'edit' : ''}" data-t="pix" data-a="pix"><canvas width="56" height="56"></canvas></span>` + (n.mask ? mthumb(true) : ''));
   const locked = userLock(n), gh = ih && n.visible, gl = il && !locked;   // the group's state shows faintly where the row's own does not say it
-  const marks = (isPinned(n) ? `<span class="pin" data-tip="${n.mmask ? T.mainMaskTip : T.mainTip}" data-side="left">${hyIcon("master", 13, 2)}</span>` : '') + (n.link ? `<span class="lkd" data-tip="${T.linkedTip}" data-side="left">${svg('link', 13)}</span>` : '') + (n.gen ? `<span class="lkd" data-tip="${T.generativeLayer}" data-side="left">${svg('spark', 13)}</span>` : '');
-  return `<div class="lr ${sel ? 'sel' : ''} ${n.visible ? '' : 'hid'} ${gh ? 'ghid' : ''} ${gl ? 'glock' : ''} ${S.enter === n.id ? 'enter' : ''} ${n.main ? 'main' : ''} ${n.mmask ? 'mmask' : ''} ${n.color ? 'hy-rc' : ''}" data-id="${n.id}"${n.color && window.hyRowColor ? ` style="--hy-rc:${hyRowColor(n.color)}"` : ''}>${ind}${lead}<span class="nm ${isB ? 'base' : ''}">${esc(n.frames ? T.framesN(n.children.length) : n.name)}</span>${marks}` +
-    (n.frame ? `<button class="rb keep inc ${n.include === false ? 'off' : ''}" data-a="incl" data-tip="${T.includeTip}" data-side="left">${svg('adj', 14)}</button>` : '') +
-    (isPinned(n) ? '' : n.base ? K.baseLock() : `<button class="rb ${locked || gl ? 'keep' : ''} ${gl ? 'inh' : ''}" data-a="lock" data-tip="${locked ? T.lockedTip : gl ? T.lockedByGroup : T.lockTip}" data-side="left">${LOCKI(locked || gl)}</button>`) +
-    `<button class="rb ${n.visible && !gh ? '' : 'keep'} ${gh ? 'inh' : ''}" data-a="eye" data-tip="${gh ? T.hiddenByGroup : T.showHide}" data-side="left">${svg(n.visible && !gh ? 'eye' : 'eyeoff', 15)}</button></div>`;
+  const marks = (isPinned(n) ? `<span class="pin" data-tip="${n.mmask ? T.mainMaskTip : T.mainTip}" data-side="left">${hyIcon("master", 13, 2)}</span>` : '') + (n.link ? `<span class="lkd" data-tip="${T.linkedTip}" data-side="left">${svg('link', 13)}</span>` : '') + (n.gen ? `<span class="lkd" data-tip="${T.generativeLayer}" data-side="left">${svg('spark', 13)}</span>` : '')
+    + (n.gen && (n.gen.status === 'run' || n.gen.status === 'err') ? genLed(n.gen.status) : '');
+  return `<div class="lr hy-hovrow ${sel ? 'sel' : ''} ${n.visible ? '' : 'hid'} ${gh ? 'ghid' : ''} ${gl ? 'glock' : ''} ${S.enter === n.id ? 'enter' : ''} ${n.main ? 'main' : ''} ${n.mmask ? 'mmask' : ''} ${n.color ? 'hy-rc' : ''}" data-id="${n.id}"${n.color && window.hyRowColor ? ` style="--hy-rc:${hyRowColor(n.color)}"` : ''}>${ind}${lead}<span class="nm ${isB ? 'base' : ''}">${esc(n.frames ? T.framesN(n.children.length) : n.name)}</span>${marks}` +
+    (n.frame ? `<button class="rb hy-ri keep inc ${n.include === false ? 'off' : ''}" data-a="incl" data-tip="${T.includeTip}" data-side="left">${svg('adj', 14)}</button>` : '') +
+    (isPinned(n) ? '' : n.base ? K.baseLock() : `<button class="rb hy-ri ${locked || gl ? 'keep' : ''} ${gl ? 'inh' : ''}" data-a="lock" data-tip="${locked ? T.lockedTip : gl ? T.lockedByGroup : T.lockTip}" data-side="left">${LOCKI(locked || gl)}</button>`) +
+    `<button class="rb hy-ri ${n.visible && !gh ? '' : 'keep'} ${gh ? 'inh' : ''}" data-a="eye" data-tip="${gh ? T.hiddenByGroup : T.showHide}" data-side="left">${svg(n.visible && !gh ? 'eye' : 'eyeoff', 15)}</button></div>`;
 }
 function listHTML(list, depth, ih, il) {
   let h = '';
@@ -2267,7 +2278,7 @@ function listHTML(list, depth, ih, il) {
 function renderLayers() {
   const st = listEl.scrollTop; rowsEl.innerHTML = BM && !S.ready ? `<div id="lwait">${T.loadingLayers}</div>` : listHTML(root, 0); listEl.scrollTop = st; S.enter = null;
   let cnt = 0; walk(root, () => { cnt++; }); const lc = $('#lcount'); if (lc) lc.textContent = cnt;
-  S.thumbs = true; drawThumbs(); syncLset();
+  S.thumbs = true; drawThumbs(); syncLset(); if (K.onRows) K.onRows(rowsEl);   // the rows' counts of open annotations (annwork.js)
 }
 function drawThumbs() {
   rowsEl.querySelectorAll('.tb2 canvas').forEach(cv => {
@@ -2328,7 +2339,7 @@ const CLIPCUR = (() => {   // the clip icon (Hyimg ui/icons.js «clip»), white 
   return `url("data:image/svg+xml,${encodeURIComponent(sv)}") 5 4, alias`; })();
 $('#list').addEventListener('pointerdown', e => { if (e.target.id === 'list' || e.target.id === 'rows') { if (S.ids.length && !S.maskMode && !S.xf) { S.ids = []; S.editMask = false; refresh(); } } });
 rowsEl.addEventListener('pointerdown', e => {
-  if (e.button !== 0) return;
+  if (e.button !== 0) return; const sig = () => [S.ids.join(), S.editMask, S.anchor].join('|'), sig0 = sig();   // the rows stay when nothing changed (S-12)
   const lr = e.target.closest('.lr'); const a = e.target.closest('[data-a]');
   if (e.altKey) { const pair = clipPairAt(e.clientY); if (pair) { e.preventDefault(); e.stopPropagation();   // not #list's «press on nothing: deselect»
     // on the line: a click clips; from a row there a drag copies it instead (decided on the move or the release)
@@ -2349,7 +2360,7 @@ rowsEl.addEventListener('pointerdown', e => {
   else rowDrag = { pend: id };
   if (!n.mask) S.editMask = false;
   if (n.mmask) S.editMask = true;   // the master mask is only a mask: the brush paints on it
-  refresh();
+  if (sig() !== sig0) refresh();   // a second press on the chosen row keeps its element: the double click comes (P4 S-12)
   rowDrag = { id, y: e.clientY, x: e.clientX, on: false, pid: e.pointerId, pend: rowDrag && rowDrag.pend, alt: e.altKey };
 });
 let lastPt = null;
@@ -2376,7 +2387,7 @@ addEventListener('pointerup', e => {
   if (!rowDrag) return; const d = rowDrag; rowDrag = null; insEl.classList.remove('on'); rowsEl.querySelectorAll('.into').forEach(r => r.classList.remove('into'));
   if (d.on) listEl.style.cursor = '';
   if (d.clip && !d.on) { toggleClip(d.clip); return; }   // ⌥-click on the line
-  if (d.on && d.target) moveTo(d.target, e.altKey || d.alt); else if (d.pend && !d.on) { S.ids = [d.pend]; S.anchor = d.pend; refresh(); } else renderLayers();
+  if (d.on && d.target) moveTo(d.target, e.altKey || d.alt); else if (d.pend && !d.on) { S.ids = [d.pend]; S.anchor = d.pend; refresh(); } else if (d.on) renderLayers();
 });
 function clipPairAt(y) {
   const vr = visibleRows();
@@ -2427,14 +2438,15 @@ function moveTo(t, copy) {   // ⌥ at the press or the drop: copies go there, t
 }
 rowsEl.addEventListener('pointerover', e => { const r = e.target.closest('.lr'); const id = r ? r.dataset.id : null; if (id !== S.hoverRow) { S.hoverRow = id; S.odirty = true; } });
 rowsEl.addEventListener('pointerleave', () => { S.hoverRow = null; S.odirty = true; });
-rowsEl.addEventListener('dblclick', e => {
-  const fz = e.target.closest('[data-a=frm]'); if (fz) { const f = byId(fz.closest('.lr').dataset.id); if (f) { zoomToRect(f.frame); if (!f.open) { f.open = true; renderLayers(); } } return; }
-  const nm = e.target.closest('.nm'); if (!nm) return; const n = byId(nm.closest('.lr').dataset.id); if (!n || isPinned(n) || K.baseStop([n])) return;
+function rowDbl(e) {   // a double click: rename, or the frame's zoom
+  const fz = e.target.closest('[data-a=frm]'); if (fz) { const f = byId(fz.closest('.lr').dataset.id); if (f) { zoomToRect(f.frame); if (!f.open) { f.open = true; renderLayers(); } } return true; }
+  const nm = e.target.closest('.nm'); if (!nm || nm.querySelector('input')) return !!nm; const n = byId(nm.closest('.lr').dataset.id); if (!n || isPinned(n) || K.baseStop([n])) return false;
   nm.innerHTML = `<input value="${esc(n.name)}">`; const inp = nm.querySelector('input'); inp.focus(); inp.select();
   let fin = false; const done = ok => { if (fin) return; fin = true; const v = inp.value.trim(); if (ok && v && v !== n.name) edit(T.h.rename, () => { n.name = v; }); else renderLayers(); };
-  inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); });
-  inp.addEventListener('blur', () => done(true)); inp.addEventListener('pointerdown', ev => ev.stopPropagation());
-});
+  hyTyping.keys(inp, { esc: 'cancel', enter: 'line', apply: () => done(true), cancel: () => done(false), primary: () => saveFrame() });   // a name: Esc puts it back
+  inp.addEventListener('blur', () => done(true)); inp.addEventListener('pointerdown', ev => ev.stopPropagation()); return true;
+}
+for (const t of ['mousedown', 'dblclick']) rowsEl.addEventListener(t, e => { if ((t === 'dblclick' || e.detail === 2) && e.target.closest('.lr') && rowDbl(e)) e.preventDefault(); });
 rowsEl.addEventListener('contextmenu', e => { e.preventDefault(); if (K.rowMenu) K.rowMenu(e); });   // the row's and the mask's menus (menus.js)
 // the strip above the list: blend mode and opacity
 const lset = $('#lset'), blendBtn = $('#blendBtn');
@@ -2925,7 +2937,7 @@ async function genCreate() {
   refresh(); showPanel('gen'); await genRun(node.id);
 }
 async function genRun(id) {
-  let n = byId(id); if (!n || !n.gen) return; const g = n.gen; S.busy = true; g.status = 'run'; g.vars = [null, null, null]; renderGen();
+  let n = byId(id); if (!n || !n.gen) return; const g = n.gen; if (!g.src) { const s2 = genSource(); if (!s2) return toast(T.genNeeds, 'spark'); g.src = s2; g.rect = g.rect || { x: s2.b.x, y: s2.b.y, w: s2.b.w, h: s2.b.h }; } S.busy = true; g.status = 'run'; g.vars = [null, null, null]; renderGen(); renderLayers();
   const ref = g.refId ? byId(g.refId) : null;
   S.pend = { m: tintRed(g.src.m), k: g.src.k, b: g.src.b, label: T.genStep(1) };
   try {
@@ -2947,8 +2959,9 @@ function renderGen() {
   const n = one(), g = n && n.gen; el.innerHTML = '';
   const ta = document.createElement('textarea'); ta.className = 'gta'; ta.placeholder = T.genPrompt; ta.value = g ? g.prompt || '' : S.genPrompt;
   const note = div('note gnote', T.genPromptNote); note.style.display = ta.value.trim() ? '' : 'none';
-  ta.addEventListener('input', () => { if (g) g.prompt = ta.value; else S.genPrompt = ta.value; note.style.display = ta.value.trim() ? '' : 'none'; });
-  ta.addEventListener('keydown', e => e.stopPropagation());
+  ta.addEventListener('input', () => { if (g) { if (!S.pending) beginEdit(T.h.prompt); g.prompt = ta.value; } else S.genPrompt = ta.value; note.style.display = ta.value.trim() ? '' : 'none'; });
+  const put = () => { if (S.pending && S.pending.label === T.h.prompt) endEdit(); };   // the typing is one step and leaves the frame unsaved (P4 S-55)
+  hyTyping.keys(ta, { esc: 'apply', enter: 'mod', apply: () => ta.blur(), primary: () => saveFrame() }); ta.addEventListener('blur', put);
   el.append(div('gh', `${svg('spark', 15)}<b>${g ? esc(n.name) : T.generativeLayer}</b>`), ta, note);
   const btn = document.createElement('button'); btn.className = 'btn gbtn';
   if (!g) {
@@ -3018,7 +3031,7 @@ const PN = [
   { id: 'layers', g: 'g2', name: T.panel.layers, icon: 'layers', key: 'F7' },
   { id: 'props', g: 'g1', name: T.panel.props, icon: 'sliders' },
   { id: 'adj', g: 'g1', name: T.panel.adj, icon: 'adj' },
-  { id: 'hist', g: 'g1', name: T.panel.hist, icon: 'hist' },
+  { id: 'hist', g: 'g1', name: T.panel.hist, icon: 'hist' }, { id: 'ann', g: 'g1', name: T.panel.ann, icon: 'comment' },   // ann: annwork.js, round 17 v2
   { id: 'chan', g: 'g2', name: T.panel.chan, icon: 'channels' },
   { id: 'gen', g: 'g1', name: T.panel.gen, icon: 'spark' }
 ];
@@ -3037,7 +3050,7 @@ if (GS.splitH != null) S.splitH = GS.splitH;
 const side = $('#side');
 const sideOpen = () => !(GS.g1.closed && GS.g2.closed);
 document.querySelectorAll('.tab').forEach(tb => { const d = PN.find(x => x.id === tb.dataset.t); if (!d) return;
-  tb.innerHTML = `<span class="ti">${svg(d.icon, 14)}</span><span class="tl">${d.name}${d.id === 'layers' ? ' <span class="tc" id="lcount"></span>' : ''}</span>`; if (d.key) { tb.dataset.tip = d.name; tb.dataset.key = d.key; tb.dataset.side = 'bottom'; } });
+  tb.innerHTML = `<span class="ti">${svg(d.icon, 14)}</span><span class="tl">${d.name}${d.id === 'layers' ? ' <span class="tc" id="lcount"></span>' : d.id === 'ann' ? ' <span class="tc" id="acount"></span>' : ''}</span>`; if (d.key) { tb.dataset.tip = d.name; tb.dataset.key = d.key; tb.dataset.side = 'bottom'; } });
 document.querySelectorAll('.pg .gm').forEach(b => { b.dataset.tip = T.groupMenu; b.dataset.side = 'left'; });
 $('#split').dataset.tip = T.splitTip;
 function setTab(g, t, quiet) {
@@ -3045,7 +3058,7 @@ function setTab(g, t, quiet) {
   el.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   el.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.p === t));
   if (!quiet) saveGS();
-  if (t === 'hist') renderHist(); if (t === 'chan') renderChan(); if (t === 'adj') renderAdj(); if (t === 'gen') renderGen();
+  if (t === 'hist') renderHist(); if (t === 'chan') renderChan(); if (t === 'adj') renderAdj(); if (t === 'gen') renderGen(); if (t === 'ann' && K.onAnnTab) K.onAnnTab();
   fitTabs();
 }
 // tabs show their icon and label; when a group holds more tabs than fit, only the open one keeps its label
@@ -3308,6 +3321,7 @@ actsIn.addEventListener('keydown', e => {
   e.stopPropagation(); const n = AC.items.length;
   if (e.key === 'ArrowDown') { e.preventDefault(); AC.idx = Math.min(n - 1, AC.idx + 1); renderActs(); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); AC.idx = Math.max(0, AC.idx - 1); renderActs(); }
+  else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); closeActs(); saveFrame(); }   // ⌘↵ saves, as everywhere (P4 S-23)
   else if (e.key === 'Enter') { e.preventDefault(); runAct(AC.idx); }
   else if (e.key === 'ArrowRight' && !actsIn.value) { const c = AC.items[AC.idx]; if (c && c.sub) { e.preventDefault(); runAct(AC.idx); } else if (!AC.stack.length) { e.preventDefault(); const i = CATS.findIndex(x => x[0] === AC.cat); AC.cat = CATS[(i + 1) % CATS.length][0]; AC.idx = 0; renderActs(); } }
   else if (e.key === 'ArrowLeft' && !actsIn.value) { e.preventDefault(); if (AC.stack.length) actsBack(); else { const i = CATS.findIndex(x => x[0] === AC.cat); AC.cat = CATS[(i + CATS.length - 1) % CATS.length][0]; AC.idx = 0; renderActs(); } }
@@ -3316,7 +3330,8 @@ actsIn.addEventListener('keydown', e => {
 });
 document.addEventListener('pointerdown', e => { if (actsOpen() && !e.target.closest('#acts, #bActs')) closeActs(); }, true);
 addEventListener('keydown', e => {
-  const inField = e.target.closest && e.target.closest('input, textarea, select');
+  const inField = (window.hyTyping && hyTyping(e)) || (e.target.closest && e.target.closest('input, textarea, select'));
+  if (dlgw.classList.contains('on') || document.getElementById('hyConfirm')) return;   // a question open: Actions wait (P4 S-03)
   if ((e.metaKey || e.ctrlKey) && (e.code === 'KeyK' || e.code === 'KeyF')) { e.preventDefault(); e.stopImmediatePropagation(); actsOpen() ? closeActs() : openActs(); return; }
   if (e.key === '/' && !inField && !e.metaKey && !e.ctrlKey && !dlgw.classList.contains('on')) { e.preventDefault(); e.stopImmediatePropagation(); openActs(); }
 }, true);
@@ -3352,13 +3367,14 @@ crumb.innerHTML = `<button id="cHome" data-tip="${T.home}" data-side="bottom" ar
   `<button id="cBoard" class="cx" data-side="bottom"><span class="cn">${esc(FR.board)}</span></button><span class="cs cxs">${CHEV}</span>` +
   `<button id="cPage" class="cx" data-side="bottom"><span class="cn">${esc(FR.page)}</span></button><span class="cs">${CHEV}</span>` +
   `<button id="cFrame" aria-haspopup="menu" aria-expanded="false"><span id="cFrameName">${esc(BATCH ? T.nFrames(NB) : FR.name)}</span>${CHEV.replace('class="hy-chev"', 'class="hy-chev dn"')}</button>`;
-const isDirty = () => S.ver !== S.savedVer;
+const isDirty = () => (S.undo[S.undo.length - 1] || null) !== S.savedTop || !!S.pending;   // the work as saved, not a count of steps (P4 S-49)
+const nameTo = v => { FR.name = v; $('#cFrameName').textContent = v; if (HOST && HOST.name) HOST.name(v); layout(); };
 // Home and the project go on through the board's own crumb; the board and the page are where the editor was opened from
 function leaveTo(where) {
   if (S.saving) return toast(T.savingWait, 'frame');
   const go = () => { if (BM && (where === 'board' || where === 'page')) exitBoard(); else if (HOST) HOST.leave(where); else toast(T.closedNoSave, 'x'); };
   if (!isDirty()) return go();
-  openDialog(T.saveQ(FR.name), 'frame', b => b.append(div('note', T.saveQNote)), () => saveFrame(go), { ok: T.save, alt: T.dontSave, altFn: go });
+  askLeave(go, () => saveFrame(go));
 }
 $('#cHome').addEventListener('click', () => leaveTo('home'));
 $('#cProj').addEventListener('click', () => leaveTo('project'));
@@ -3374,27 +3390,28 @@ $('#cFrame').addEventListener('click', e => {
   b.setAttribute('aria-expanded', 'true');
 });
 $('#cFrame').addEventListener('dblclick', () => { if (!BATCH) renameFrame(); });
+const renameTo = v => edit(T.h.renameFrame, () => nameTo(v));   // the frame's name, one step (P4 S-48)
 function renameFrame() {
   const sp = $('#cFrameName'); sp.innerHTML = `<input value="${esc(FR.name)}" spellcheck="false">`; const inp = sp.querySelector('input'); inp.focus(); inp.select();
-  let fin = false; const done = ok => { if (fin) return; fin = true; const v = inp.value.trim(); if (ok && v && v !== FR.name) { FR.name = v; S.ver++; } sp.textContent = FR.name; layout(); };
-  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
+  let fin = false; const done = ok => { if (fin) return; fin = true; const v = inp.value.trim(); sp.textContent = FR.name; if (ok && v && v !== FR.name) renameTo(v); else layout(); };
+  hyTyping.keys(inp, { esc: 'cancel', enter: 'line', apply: () => done(true), cancel: () => done(false), primary: () => saveFrame() });   // a name (owner decision 2026-10-10)
   inp.addEventListener('blur', () => done(true)); inp.addEventListener('click', e => e.stopPropagation());
 }
 $('#tlibR').dataset.tip = T.library; $('#tlibR').dataset.key = '⌘ .'; $('#tlibR').dataset.side = 'bottom'; $('#tlibR').setAttribute('aria-label', T.library);
 $('#libp .lhd b').textContent = T.library; $('#libp .lhd .note').innerHTML = T.libHint;
 // Cancel and Save, the Studio's session actions top right: Hyimg's one element for them in every Studio (ui/hy/actions.js; owner 2026-10-09:
 // «кнопки Done у нас всегда стандартизированы справа вверху ... чтобы они везде были идентичны»); the keys stay Esc and ⌘↵
-$('#topr').actions = [{ id: 'cancel', label: T.cancel, tip: T.cancelTip, key: 'Esc', run: () => cancelFrame() },
-  { id: 'save', label: T.save, tip: T.saveTip, key: '⌘ ↵', primary: true, run: () => saveFrame() }];
+$('#topr').actions = [{ id: 'cancel', label: T.cancel, tip: T.cancelTip, run: () => cancelFrame() },   // Esc keeps the work (S-27): not Cancel's key
+  { id: 'save', label: T.save, tip: T.saveTip, key: '⌘↵', primary: true, run: () => saveFrame() }];
 $('#topr').setAttribute('aria-label', T.studioActs);   // the element's own label asks the page's T, a table here, not the board's words
 const bset = $('#bset');
 bset.innerHTML = svg('gear', 18, 1.8); bset.dataset.tip = T.settings; bset.dataset.side = 'left'; bset.setAttribute('aria-label', T.settings);
 function closeEditor() { if (BM) exitBoard(); else if (HOST) HOST.close(); else toast(T.closedNoSave, 'x'); }
-function cancelFrame() {
-  if (S.saving) return toast(T.savingWait, 'frame');
-  if (!isDirty()) return closeEditor();
-  openDialog(T.discardQ, 'x', b => b.append(div('note', T.discardNote)), closeEditor, { ok: T.discard });
-}
+function cancelFrame() { if (S.saving) return toast(T.savingWait, 'frame'); if (!isDirty()) return closeEditor(); askLeave(closeEditor, () => saveFrame()); }
+// Hyimg's one question before unsaved work is left (ui/confirm.js hyLeave): Keep editing, Discard, Save; an older Hyimg asks its own way
+function askLeave(discard, save) { import('/ui/confirm.js').then(m => (m.hyLeave || (o => m.hyConfirm({ title: T.saveQ(o.name), note: T.saveQNote, ok: T.discard, cancel: T.keepEditing, onOk: o.discard, accent: o.accent, save: { label: T.save, run: o.save } })))({ name: FR.name, discard, save, accent: 'var(--frame)' })); }
+// the last Esc, the board's Board segment and another Studio's: the work kept, saved when there is any; a promise, done once it is closed or stayed
+function keepFrame() { if (S.saving || S.leaving) return Promise.resolve(); return isDirty() ? (K.away && K.away.can() ? K.away.go() : saveFrame()) : Promise.resolve(closeEditor()); }
 // settings: the paper the editor sits on, as the board's own setting (cv.paperDark)
 const sets = $('#sets');
 const PAPERS = [['#17171a', T.paperDefault], ['#0c0c0e', T.paperDeep], ['#232327', T.paperLight]];
@@ -3462,7 +3479,7 @@ async function nodeIn(d) {
   else return null;
   c._v = c._v || 1;
   const n = common(pixNode(d.name || T.picture, c, d.x, d.y, d.w, d.h), d);
-  n.angle = d.rot || 0; n.fx = !!(d.flip && d.flip[0]); n.fy = !!(d.flip && d.flip[1]);
+  n.angle = d.rot || 0; n.fx = !!(d.flip && d.flip[0]); n.fy = !!(d.flip && d.flip[1]); if (d.prompt) n.gen = { prompt: String(d.prompt), vars: [null, null, null], pick: 0, status: 'done' };
   if (d.kind === 'pic') { markOrig(n); n.src = { path: d.path, crop: d.crop || null, board: d.board || null, v0: c._v, missing }; }
   else { if (d.file) SAVED.set(n.id + '|layer', { c, v: c._v, file: d.file }); if (d.locked) markOrig(n); }
   n.mask = await maskIn(n.id, d.mask); return n;
@@ -3574,7 +3591,7 @@ function nodeOut(n) {
   if (n.type === 'adjust') return { ...b, kind: 'grade', params: n.params, mask: maskOut(n) };
   const geo = { x: n.x, y: n.y, w: n.w, h: n.h, rot: n.angle || 0, flip: [!!n.fx, !!n.fy], mask: maskOut(n) };
   if (keepsLink(n)) return { ...b, kind: 'pic', path: n.src.path, crop: n.src.crop, ...geo, locked: true, board: n.src.board };
-  return { ...b, kind: 'paint', file: fileOf(n.id + '|layer', `${DIR}/layers/${n.id}.png`), ...geo, locked: !!n.orig, ...(n.src ? { from: n.src.path } : {}) };
+  return { ...b, kind: 'paint', file: fileOf(n.id + '|layer', `${DIR}/layers/${n.id}.png`), ...geo, locked: !!n.orig, ...(n.src ? { from: n.src.path } : {}), ...(n.gen && n.gen.prompt ? { prompt: n.gen.prompt } : {}) };
 }
 function docJSON(v) { return { version: 1, v: v ?? VERSION, name: FR.name, size: [W, H], background: BG, order: 'bottom-to-top', layers: root.filter(n => !isPinned(n)).map(nodeOut), mask: S.mmDoc || undefined, guides: S.gl.map(g => ({ o: g.o, pos: g.pos })),
   render: v ? `${DIR}/render.${v}.png` : undefined, saved: new Date().toISOString() }; }
@@ -3605,7 +3622,7 @@ async function saveFrame(after) {
   S.saving = true;
   clearTimeout(rTimer); rcard.classList.remove('done', 'err'); $('#rtitle').textContent = T.saving; const bar = rcard.querySelector('.bar i');
   bar.style.transition = 'none'; bar.style.width = '0'; bar.offsetWidth; bar.style.transition = ''; rcard.classList.add('on');
-  const step = k => new Promise(res => { bar.style.width = k + '%'; requestAnimationFrame(() => setTimeout(res, 20)); });
+  const step = k => new Promise(res => { bar.style.width = k + '%'; if (K.away && K.away.on) return res(); requestAnimationFrame(() => setTimeout(res, 20)); });   // hidden: no frames
   try {
     const nv = await nextVersion(), ndoc = `${DIR}/frame.${nv}.json`, nrender = `${DIR}/render.${nv}.png`;
     await step(12); await writeParts(nv); const mmo = await mmSave(nv); S.mmDoc = mmo;
@@ -3620,19 +3637,20 @@ async function saveFrame(after) {
     const box = rcard.querySelector('.pv'); box.innerHTML = ''; box.append(pv);
     window.__lastRender = { w: W, h: H, cw: full.width, ch: full.height, mtime: r.mtime };
     full.width = full.height = 1;
-    S.savedVer = S.ver; S.saving = false;
+    S.savedVer = S.ver; S.savedTop = S.undo[S.undo.length - 1] || null; S.burst = null; S.saving = false;
     const pics = []; walk(root, n => { if (n.src && !pics.includes(n.src.path)) pics.push(n.src.path); });
     const shown = HOST ? HOST.saved({ name: FR.name, size: [W, H], rv: Math.round(r.mtime / 1e6), pics, alpha: !BG, doc: ndoc, render: nrender, v: nv, grade: mainGradeOut(), mask: mmo && mmo.on ? mmCard(mmo) : null }) : null;   // the server's mtime is in ns
     // the versions past the last 10 go, with the files only they used (inpaint/routes.py prune); a failure leaves them, nothing breaks
     fetch(`/api/plugin/${PLUGIN}/prune`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dir: DIR, keep: 10 }) }).catch(() => {});
-    rcard.classList.add('done'); $('#rtitle').textContent = T.saved(W, H); toast(T.saved(W, H), 'spark');
+    if (K.away && K.away.on) return K.away.saved(shown);   // the studio left before the write (awaywork.js): the card shows it, this page goes
+    rcard.classList.add('done'); $('#rtitle').textContent = T.saved(W, H); if (!HOST) toast(T.saved(W, H), 'spark');   // on the board the board's note says it once (P4 S-52)
     if (typeof after === 'function') { await shown; after(); }
     else if (BM) { await shown; rcard.classList.remove('on', 'done'); closeEditor(); }   // the card shows the new render: leave over the same picture
     else if (HOST) rTimer = setTimeout(closeEditor, 700);
     else rTimer = setTimeout(() => rcard.classList.remove('on', 'done'), 6500);
   } catch (e) {
     console.error(e); S.saving = false; rcard.classList.add('err'); $('#rtitle').textContent = T.saveFailed + e.message; toast(T.saveFailed + e.message, 'x');
-    rTimer = setTimeout(() => rcard.classList.remove('on', 'err'), 9000);
+    if (K.away && K.away.on) return K.away.failed(e); rTimer = setTimeout(() => rcard.classList.remove('on', 'err'), 9000);
   }
 }
 /* ================= canvas pointer ================= */
@@ -3761,12 +3779,12 @@ view.addEventListener('wheel', e => { e.preventDefault(); if (e.ctrlKey || e.met
 /* ================= keyboard ================= */
 const sizeStep = (v, d) => clamp(v + d * (v < 10 ? 1 : v < 50 ? 4 : v < 150 ? 10 : v < 400 ? 25 : 50), 1, 1500);
 addEventListener('keydown', e => {
-  if (e.target.closest && e.target.closest('input, textarea, select')) return;
+  if ((window.hyTyping && hyTyping(e)) || (e.target.closest && e.target.closest('input, textarea, select'))) return;   // Hyimg's one rule (ui/typing.js), a slider too
   if (dlgw.classList.contains('on') || actsOpen()) return;
   const meta = e.metaKey || e.ctrlKey, k = e.code;
   if (e.key === 'Alt') { if (!e.repeat) S.altTap = { clean: true, t: performance.now() }; return; }
   if (S.altTap) S.altTap.clean = false;
-  if (e.key === 'Escape') { if (menuOpen()) { closeMenu(); return; } if (sets.classList.contains('on')) { sets.classList.remove('on'); bset.setAttribute('aria-expanded', 'false'); return; } if (curMode()) cancelMode(); else cancelFrame(); return; }
+  if (e.key === 'Escape') { if (S.hsPick) { S.hsPick = null; updCursor(); return; } if (menuOpen()) { closeMenu(); return; } if (sets.classList.contains('on')) { sets.classList.remove('on'); bset.setAttribute('aria-expanded', 'false'); return; } if (curMode()) cancelMode(); else keepFrame(); return; }
   if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); applyMode(); return; }
   if (meta && BM && (k === 'Period' || e.key === '.')) { e.preventDefault(); HOST.toggleLib(); return; }
   if (meta) {
@@ -3785,7 +3803,7 @@ addEventListener('keydown', e => {
   if (e.altKey) return;
   if (k === 'Space') { e.preventDefault(); if (!S.space) { S.space = true; updCursor(); } return; }
   { const cands = TOOLS.filter(x => x.code === k);
-    if (cands.length) { if (e.shiftKey) { const g = groupOf(cands[0].id), i = g.tools.indexOf(S.tool); setTool(g.tools[(i + 1) % g.tools.length]); } else setTool(S.tool !== cands[0].id && cands.some(c => c.id === S.tool) ? S.tool : cands[0].id); return; } }
+    if (cands.length) { if (e.shiftKey) { const i = cands.findIndex(c => c.id === S.tool); setTool(cands[(i < 0 ? 1 : i + 1) % cands.length].id); } else setTool(S.tool !== cands[0].id && cands.some(c => c.id === S.tool) ? S.tool : cands[0].id); return; } }
   if (k === 'F7') { e.preventDefault(); togglePanel('layers'); return; }
   if (k === 'KeyX') { swapColors(); return; }
   if (k === 'KeyD') { resetColors(); return; }
@@ -3903,8 +3921,8 @@ init();
 try { if (parent !== window) new MutationObserver(() => { const was = INSET; if (!lookSync()) return; if (INSET !== was) layout(); S.odirty = true; S.dirty = true; })
   .observe(parent.document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme', 'data-shape', 'data-shadow'] }); } catch (e) {}
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { layout(); placeRailHl(); if (!S.moved) fit(false); });
-window.__ed = { get ready() { return !!S.ready; }, docJSON, loadDoc, open: openInBoard, exit: () => cancelFrame(), zoomTo, frameMenu, leaveTo, actsOpen, fitView: () => fit(true),
-  setName: v => { FR.name = v; $('#cFrameName').textContent = v; S.ver++; }, get BM() { return BM; }, ENT, get VERSION() { return VERSION; }, addLibPics, canvasSize, cancelFrame, DOC, HOST, BATCH, frameList, renderFrame, histBlocks, saveSnap, restoreSnap, histGo, S, V, T, showPanel, togglePanel, genCreate, PN, HyCG, selectSubject, removeBackground, GROUPS, setTool, GS, runFill, fillSelection, setTab, setShut, applySplit, startFT, applyXf, cancelXf,
+window.__ed = { get ready() { return !!S.ready; }, docJSON, loadDoc, open: openInBoard, exit: () => keepFrame(), keepFrame, zoomTo, frameMenu, leaveTo, actsOpen, fitView: () => fit(true),
+  setName: v => renameTo(v), get BM() { return BM; }, ENT, get VERSION() { return VERSION; }, addLibPics, canvasSize, cancelFrame, DOC, HOST, BATCH, frameList, renderFrame, histBlocks, saveSnap, restoreSnap, histGo, S, V, T, showPanel, togglePanel, genCreate, PN, HyCG, selectSubject, removeBackground, GROUPS, setTool, GS, runFill, fillSelection, setTab, setShut, applySplit, startFT, applyXf, cancelXf,
   openActs, closeActs, toggleRulers, toggleLib, saveFrame, cancelFrame, layout, setChan, get TOPY() { return TOPY; }, get root() { return root; }, get W() { return W; }, get H() { return H; }, byId, locate, renderDoc, sampleAt, refresh, Field,   // Field: the slider tests build one in the page
   mmNode, mmCopy, mmPaste, mmFromAlpha, mmFromSel, mmClear, mmMenu, invertMask, renderView, pickUnder, get acc() { return acc; }, toDoc, startStroke, strokeTo, endStroke, selectAll, deselect, commitSel };
 // what the studio's own modules (maskwork.js, clipwork.js, selwork.js, menus.js) work with; K holds what they give back (their words, keys and menus)
@@ -3913,10 +3931,10 @@ Object.assign(K, { S, T, svg, esc, mk, copyC, bump, one, selNodes, topSel, byId,
   featherDialog, valueDialog, copyToLayer, duplicate, deleteSel, groupSel, ungroup, mergeDown, mergeVisible, rasterize, toggleClip, clipPairAt, addMask, deleteMask, invertMask,
   maskMenu, mmMenu, enterMaskMode, applyMaskMode, leaveMaskMode, toggleFilm, startFT, undo, fillSelection, hitTest, toDoc, pixNode, docCanvas, insertAbove, lk, lockedByGroup,
   userLock, setLock, dockRect, clearInSel, linkSel, newLayer, setTool, dims: () => [W, H], view, get dpr() { return dpr; }, adjNode, deepCopy, HyCG, putFile, fileURL,
-  TOOLS, loadImg, frameName: () => FR.name, renderView: () => { S.dirty = true; }, moveSet, boxOf, aabb, isDesc, mmCopy });
+  TOOLS, loadImg, frameName: () => FR.name, renderView: () => { S.dirty = true; }, moveSet, boxOf, aabb, isDesc, mmCopy, isDirty, saveFrame, syncView, layout, closeActs, hideTip, ENT, host: () => HOST });
 })();
 </script>
-<script src="basework.js"></script><script src="pickwork.js"></script><script src="dockwork.js"></script>
+<script src="basework.js"></script><script src="pickwork.js"></script><script src="dockwork.js"></script><script src="annwork.js"></script><script src="awaywork.js"></script>
 <script src="maskwork.js"></script><script src="clipwork.js"></script><script src="selwork.js"></script><script src="menus.js"></script>   <!-- after the page's script: they take window.hyEdK -->
 </body>
 </html>
